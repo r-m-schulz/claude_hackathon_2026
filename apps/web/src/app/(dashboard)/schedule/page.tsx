@@ -3,7 +3,7 @@ import { mockScheduleItems } from "../../../lib/client/mockDashboard";
 
 export default function SchedulePage() {
   return (
-    <section style={{ display: "grid", gap: 16 }}>
+    <section style={{ display: "flex", flexDirection: "column", gap: 16, height: "100%", overflow: "hidden" }}>
       <header>
         <p
           style={{

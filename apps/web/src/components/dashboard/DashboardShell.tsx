@@ -82,7 +82,8 @@ export default function DashboardShell({ children }: DashboardShellProps) {
       style={{
         display: "grid",
         gridTemplateColumns: "260px 1fr",
-        minHeight: "100vh",
+        height: "100vh",
+      overflow: "hidden",
       }}
     >
       <aside
@@ -150,7 +151,7 @@ export default function DashboardShell({ children }: DashboardShellProps) {
         </div>
       </aside>
 
-      <div style={{ display: "grid", gridTemplateRows: "72px 1fr" }}>
+      <div style={{ display: "grid", gridTemplateRows: "72px 1fr", height: "100%", overflow: "hidden" }}>
         <header
           style={{
             borderBottom: "1px solid #dbe2ee",
@@ -167,7 +168,7 @@ export default function DashboardShell({ children }: DashboardShellProps) {
           </Link>
         </header>
 
-        <main style={{ padding: 24 }}>{children}</main>
+        <main style={{ padding: 24, overflow: "hidden", height: "100%", boxSizing: "border-box", display: "flex", flexDirection: "column" }}>{children}</main>
       </div>
     </div>
   );
