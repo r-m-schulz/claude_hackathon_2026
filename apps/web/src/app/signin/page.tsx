@@ -1,230 +1,542 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import type { CSSProperties, FormEvent } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { DEPARTMENTS } from "@triageai/shared";
+
 import { LogoIcon } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { DEPARTMENTS, CLINICIAN_ROLES } from "@triageai/shared";
-import type { ClinicianRole, Department, RegisterInput, RegisterResponse } from "@triageai/shared";
+import { createSupabaseBrowserClient } from "@/lib/client/supabase";
 
-type FormState = "idle" | "loading" | "success" | "error";
+const selectStyle: CSSProperties = {
+  width: "100%",
+  borderRadius: "0.75rem",
+  border: "1px solid #d6dde8",
+  padding: "12px 14px",
+  fontSize: 14,
+  color: "#172033",
+  background: "#ffffff",
+};
 
-export default function SignInPage() {
-  const router = useRouter();
+const textareaStyle: CSSProperties = {
+  width: "100%",
+  minHeight: 110,
+  borderRadius: "0.75rem",
+  border: "1px solid #d6dde8",
+  padding: "12px 14px",
+  fontSize: 14,
+  fontFamily: "inherit",
+  lineHeight: 1.6,
+  resize: "vertical",
+  color: "#172033",
+  background: "#ffffff",
+};
 
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [department, setDepartment] = useState<Department | "">("");
-  const [clinicianRole, setClinicianRole] = useState<ClinicianRole>("clinician");
+function FilePreview({
+  file,
+  label,
+}: {
+  file: File | null;
+  label: string;
+}) {
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  const [state, setState] = useState<FormState>("idle");
-  const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-
-  async function onSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    if (!department) {
-      setError("Please select a department.");
+  useEffect(() => {
+    if (!file || !file.type.startsWith("image/")) {
+      setPreviewUrl(null);
       return;
     }
 
-    setState("loading");
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+
+  return (
+    <div
+      style={{
+        border: "1px solid #dbe2ee",
+        borderRadius: 18,
+        padding: 14,
+        background: "#ffffff",
+      }}
+    >
+      <p style={{ margin: 0, fontSize: 13, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+        {label}
+      </p>
+      {previewUrl ? (
+        <div
+          style={{
+            marginTop: 12,
+            minHeight: 120,
+            borderRadius: 14,
+            backgroundImage: `url(${previewUrl})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            border: "1px solid #e2e8f0",
+          }}
+        />
+      ) : (
+        <div
+          style={{
+            marginTop: 12,
+            minHeight: 120,
+            borderRadius: 14,
+            border: "1px dashed #cbd5e1",
+            background: "#f8fafc",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            textAlign: "center",
+            color: "#64748b",
+            padding: 16,
+            lineHeight: 1.5,
+          }}
+        >
+          {file ? `${file.name} selected` : "Upload an image to preview your clinic branding"}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function SignupPage() {
+  const router = useRouter();
+  const supabase = createSupabaseBrowserClient();
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [headerFile, setHeaderFile] = useState<File | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) {
+        router.replace("/company");
+      }
+    });
+  }, [router, supabase.auth]);
+
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setLoading(true);
     setError(null);
 
-    const normalizedEmail = email.trim().toLowerCase();
-    const normalizedPassword = password.trim();
-    const full_name = `${firstName.trim()} ${lastName.trim()}`.trim();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
 
-    if (!normalizedEmail) {
-      setState("error");
-      setError("Email is required.");
-      return;
-    }
-    if (!normalizedPassword) {
-      setState("error");
-      setError("Password is required.");
-      return;
-    }
-
-    const payload: RegisterInput = {
-      role: "clinician",
-      email: normalizedEmail,
-      password: normalizedPassword,
-      full_name,
-      department,
-      clinician_role: clinicianRole,
-    };
-
-    const response = await fetch("/api/auth/register", {
+    const response = await fetch("/api/business/signup", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: formData,
     });
 
-    const data = (await response.json()) as RegisterResponse;
+    const data = (await response.json().catch(() => null)) as { error?: string } | null;
 
-    if (!response.ok || !data.success) {
-      setState("error");
-      setError(data.message || "Failed to create account.");
+    if (!response.ok) {
+      setLoading(false);
+      setError(data?.error ?? "Unable to create the business workspace.");
       return;
     }
 
-    // Account is created server-side via admin createUser; user can sign in immediately.
-    setState("success");
-    setSuccessMessage("Account created successfully. You can now sign in.");
-  }
+    const ownerEmail = String(formData.get("owner_email") ?? "");
+    const ownerPassword = String(formData.get("owner_password") ?? "");
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: ownerEmail,
+      password: ownerPassword,
+    });
 
-  if (state === "success" && successMessage) {
-    return (
-      <section className="flex min-h-screen bg-zinc-50 px-4 py-16 md:py-32 dark:bg-transparent">
-        <div className="bg-card m-auto h-fit w-full max-w-sm rounded-[calc(var(--radius)+.125rem)] border p-0.5 shadow-md">
-          <div className="p-8">
-            <LogoIcon />
-            <h1 className="mb-2 mt-4 text-xl font-semibold">Check your email</h1>
-            <p className="text-sm text-zinc-600">{successMessage}</p>
-            <Button asChild className="mt-6 w-full">
-              <Link href="/login">Go to Sign In</Link>
-            </Button>
-          </div>
-        </div>
-      </section>
-    );
+    setLoading(false);
+
+    if (signInError) {
+      setError(signInError.message);
+      return;
+    }
+
+    router.replace("/company");
   }
 
   return (
-    <section className="flex min-h-screen bg-zinc-50 px-4 py-16 md:py-32 dark:bg-transparent">
-      <form
-        onSubmit={onSubmit}
-        className="bg-card m-auto h-fit w-full max-w-sm rounded-[calc(var(--radius)+.125rem)] border p-0.5 shadow-md dark:[--color-muted:var(--color-zinc-900)]"
-      >
-        <div className="p-8 pb-6">
-          <div>
-            <Link href="/" aria-label="go home">
-              <LogoIcon />
-            </Link>
-            <h1 className="mb-1 mt-4 text-xl font-semibold">Create a TriageAI Account</h1>
-            <p className="text-sm">Clinician registration — all fields required</p>
-          </div>
-
-          <hr className="my-4 border-dashed" />
-
-          <div className="space-y-5">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label htmlFor="firstname" className="block text-sm">
-                  First Name
-                </Label>
-                <Input
-                  type="text"
-                  required
-                  id="firstname"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="lastname" className="block text-sm">
-                  Last Name
-                </Label>
-                <Input
-                  type="text"
-                  required
-                  id="lastname"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="email" className="block text-sm">
-                Email
-              </Label>
-              <Input
-                type="email"
-                required
-                id="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="pwd" className="text-sm">
-                Password
-              </Label>
-              <Input
-                type="password"
-                required
-                id="pwd"
-                minLength={8}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="department" className="block text-sm">
-                Department
-              </Label>
-              <select
-                id="department"
-                required
-                value={department}
-                onChange={(e) => setDepartment(e.target.value as Department)}
-                className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm capitalize"
+    <main
+      style={{
+        minHeight: "100vh",
+        background:
+          "radial-gradient(circle at top left, rgba(34,197,94,0.14), transparent 24%), radial-gradient(circle at top right, rgba(59,130,246,0.12), transparent 26%), #f5f7fb",
+        padding: "32px 20px 64px",
+      }}
+    >
+      <div style={{ maxWidth: 1240, margin: "0 auto", display: "grid", gap: 20 }}>
+        <section
+          style={{
+            borderRadius: 30,
+            background: "linear-gradient(135deg, #0f172a 0%, #115e59 100%)",
+            color: "#f8fafc",
+            padding: "36px 32px",
+            display: "grid",
+            gap: 22,
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+            <div style={{ maxWidth: 720 }}>
+              <Link href="/" aria-label="go home" style={{ display: "inline-flex" }}>
+                <LogoIcon />
+              </Link>
+              <p
+                style={{
+                  margin: "24px 0 12px",
+                  fontSize: 12,
+                  letterSpacing: "0.18em",
+                  textTransform: "uppercase",
+                  color: "rgba(191,219,254,0.9)",
+                }}
               >
-                <option value="" disabled>
-                  Select department…
-                </option>
-                {DEPARTMENTS.map((d) => (
-                  <option key={d} value={d} className="capitalize">
-                    {d.replace(/_/g, " ")}
-                  </option>
-                ))}
-              </select>
+                Business Signup
+              </p>
+              <h1 style={{ margin: 0, fontSize: 42, lineHeight: 1.05 }}>
+                Build a branded doctor workspace that fits how your clinic runs.
+              </h1>
+              <p style={{ marginTop: 18, maxWidth: 620, lineHeight: 1.7, color: "rgba(226,232,240,0.88)" }}>
+                Create the practice, answer onboarding questions, upload your logo and header image, and start with a
+                business workspace tailored to your team.
+              </p>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="clinicianRole" className="block text-sm">
-                Role
-              </Label>
-              <select
-                id="clinicianRole"
-                value={clinicianRole}
-                onChange={(e) => setClinicianRole(e.target.value as ClinicianRole)}
-                className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm capitalize"
-              >
-                {CLINICIAN_ROLES.map((r) => (
-                  <option key={r} value={r} className="capitalize">
-                    {r}
-                  </option>
-                ))}
-              </select>
+            <div
+              style={{
+                minWidth: 260,
+                border: "1px solid rgba(148,163,184,0.28)",
+                borderRadius: 22,
+                padding: 20,
+                background: "rgba(15,23,42,0.24)",
+                backdropFilter: "blur(14px)",
+              }}
+            >
+              <p style={{ margin: 0, fontSize: 13, textTransform: "uppercase", letterSpacing: "0.08em", color: "#bfdbfe" }}>
+                Included
+              </p>
+              <ul style={{ margin: "14px 0 0", paddingLeft: 18, lineHeight: 1.8 }}>
+                <li>Branded business header and company settings</li>
+                <li>Practitioner and HR employee roles</li>
+                <li>Patients with notes, uploads, and OCR context</li>
+                <li>Patient account pairing from the business view</li>
+              </ul>
             </div>
-
-            {error ? <p className="text-sm text-red-600">{error}</p> : null}
-
-            <Button className="w-full" type="submit" disabled={state === "loading"}>
-              {state === "loading" ? "Creating account…" : "Create Account"}
-            </Button>
           </div>
-        </div>
+        </section>
 
-        <div className="bg-muted rounded-(--radius) border p-3">
-          <p className="text-accent-foreground text-center text-sm">
-            Already have an account?
-            <Button asChild variant="link" className="px-2">
-              <Link href="/login">Sign In</Link>
-            </Button>
-          </p>
-        </div>
-      </form>
-    </section>
+        <form onSubmit={onSubmit} style={{ display: "grid", gap: 20 }}>
+          <section
+            style={{
+              display: "grid",
+              gap: 20,
+              gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+            }}
+          >
+            <div
+              style={{
+                background: "#ffffff",
+                border: "1px solid #dbe2ee",
+                borderRadius: 24,
+                padding: 24,
+                display: "grid",
+                gap: 18,
+              }}
+            >
+              <div>
+                <h2 style={{ margin: 0, fontSize: 24 }}>Practice profile</h2>
+                <p style={{ marginTop: 8, color: "#475569", lineHeight: 1.6 }}>
+                  Set the core business details for the clinic.
+                </p>
+              </div>
+
+              <div style={{ display: "grid", gap: 16 }}>
+                <div style={{ display: "grid", gap: 8 }}>
+                  <Label htmlFor="business_name">Business name</Label>
+                  <Input id="business_name" name="business_name" required placeholder="Northside Dermatology Clinic" />
+                </div>
+                <div style={{ display: "grid", gap: 8 }}>
+                  <Label htmlFor="legal_name">Legal name</Label>
+                  <Input id="legal_name" name="legal_name" placeholder="Northside Dermatology Ltd" />
+                </div>
+                <div style={{ display: "grid", gap: 8 }}>
+                  <Label htmlFor="primary_department">Primary department</Label>
+                  <select id="primary_department" name="primary_department" required style={selectStyle} defaultValue="">
+                    <option value="" disabled>
+                      Select the main specialty
+                    </option>
+                    {DEPARTMENTS.map((department) => (
+                      <option key={department} value={department}>
+                        {department.replaceAll("_", " ")}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div style={{ display: "grid", gap: 8 }}>
+                  <Label htmlFor="support_email">Support email</Label>
+                  <Input id="support_email" name="support_email" type="email" placeholder="hello@northsideclinic.ie" />
+                </div>
+                <div style={{ display: "grid", gap: 8 }}>
+                  <Label htmlFor="phone">Phone</Label>
+                  <Input id="phone" name="phone" placeholder="+353 1 555 0123" />
+                </div>
+                <div style={{ display: "grid", gap: 8 }}>
+                  <Label htmlFor="website">Website</Label>
+                  <Input id="website" name="website" placeholder="https://northsideclinic.ie" />
+                </div>
+              </div>
+            </div>
+
+            <div
+              style={{
+                background: "#ffffff",
+                border: "1px solid #dbe2ee",
+                borderRadius: 24,
+                padding: 24,
+                display: "grid",
+                gap: 18,
+              }}
+            >
+              <div>
+                <h2 style={{ margin: 0, fontSize: 24 }}>Location and brand</h2>
+                <p style={{ marginTop: 8, color: "#475569", lineHeight: 1.6 }}>
+                  These answers shape the company header and business settings page.
+                </p>
+              </div>
+
+              <div style={{ display: "grid", gap: 16 }}>
+                <div style={{ display: "grid", gap: 8 }}>
+                  <Label htmlFor="address_line">Address</Label>
+                  <Input id="address_line" name="address_line" placeholder="12 Main Street" />
+                </div>
+                <div style={{ display: "grid", gap: 8 }}>
+                  <Label htmlFor="city">City</Label>
+                  <Input id="city" name="city" placeholder="Dublin" />
+                </div>
+                <div style={{ display: "grid", gap: 8 }}>
+                  <Label htmlFor="country">Country</Label>
+                  <Input id="country" name="country" placeholder="Ireland" />
+                </div>
+                <div style={{ display: "grid", gap: 8 }}>
+                  <Label htmlFor="timezone">Timezone</Label>
+                  <Input id="timezone" name="timezone" defaultValue="Europe/Dublin" />
+                </div>
+                <div style={{ display: "grid", gap: 8 }}>
+                  <Label htmlFor="hero_headline">Header headline</Label>
+                  <Input id="hero_headline" name="hero_headline" placeholder="Fast, patient-first dermatology care" />
+                </div>
+                <div style={{ display: "grid", gap: 8 }}>
+                  <Label htmlFor="hero_subheadline">Header subheadline</Label>
+                  <Input
+                    id="hero_subheadline"
+                    name="hero_subheadline"
+                    placeholder="Built for quick specialist access, better intake, and clear follow-up."
+                  />
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section
+            style={{
+              display: "grid",
+              gap: 20,
+              gridTemplateColumns: "minmax(0, 1.2fr) minmax(300px, 0.8fr)",
+            }}
+          >
+            <div
+              style={{
+                background: "#ffffff",
+                border: "1px solid #dbe2ee",
+                borderRadius: 24,
+                padding: 24,
+                display: "grid",
+                gap: 18,
+              }}
+            >
+              <div>
+                <h2 style={{ margin: 0, fontSize: 24 }}>Tailoring questions</h2>
+                <p style={{ marginTop: 8, color: "#475569", lineHeight: 1.6 }}>
+                  Tell the workspace how your business operates so the company header, settings, and workflow context
+                  reflect your clinic.
+                </p>
+              </div>
+
+              <div style={{ display: "grid", gap: 16 }}>
+                <div style={{ display: "grid", gap: 8 }}>
+                  <Label htmlFor="care_model">How do you describe your care model?</Label>
+                  <textarea
+                    id="care_model"
+                    name="care_model"
+                    style={textareaStyle}
+                    placeholder="Boutique dermatology practice focused on rapid lesion review and preventative skin health."
+                  />
+                </div>
+                <div style={{ display: "grid", gap: 8 }}>
+                  <Label htmlFor="patient_volume">What is your typical patient volume?</Label>
+                  <textarea
+                    id="patient_volume"
+                    name="patient_volume"
+                    style={textareaStyle}
+                    placeholder="We see 30-40 patients per day with a mix of new referrals and return visits."
+                  />
+                </div>
+                <div style={{ display: "grid", gap: 8 }}>
+                  <Label htmlFor="workflow_needs">What workflow or calendar support matters most?</Label>
+                  <textarea
+                    id="workflow_needs"
+                    name="workflow_needs"
+                    style={textareaStyle}
+                    placeholder="HR and reception handle intake, follow-up scheduling, referral uploads, and rebooking."
+                  />
+                </div>
+                <div style={{ display: "grid", gap: 8 }}>
+                  <Label htmlFor="brand_tone">What tone should the business header and copy use?</Label>
+                  <textarea
+                    id="brand_tone"
+                    name="brand_tone"
+                    style={textareaStyle}
+                    placeholder="Warm, highly professional, reassuring, and modern."
+                  />
+                </div>
+                <div style={{ display: "grid", gap: 8 }}>
+                  <Label htmlFor="intake_priorities">What intake priorities should staff keep in mind?</Label>
+                  <textarea
+                    id="intake_priorities"
+                    name="intake_priorities"
+                    style={textareaStyle}
+                    placeholder="Image quality, urgent lesion changes, referral context, and continuity for vulnerable patients."
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gap: 18 }}>
+              <div
+                style={{
+                  background: "#ffffff",
+                  border: "1px solid #dbe2ee",
+                  borderRadius: 24,
+                  padding: 24,
+                  display: "grid",
+                  gap: 14,
+                }}
+              >
+                <div>
+                  <h2 style={{ margin: 0, fontSize: 24 }}>Brand assets</h2>
+                  <p style={{ marginTop: 8, color: "#475569", lineHeight: 1.6 }}>
+                    Upload visuals your business can reuse as the company header and logo.
+                  </p>
+                </div>
+
+                <div style={{ display: "grid", gap: 12 }}>
+                  <div style={{ display: "grid", gap: 8 }}>
+                    <Label htmlFor="logo">Logo image</Label>
+                    <input
+                      id="logo"
+                      name="logo"
+                      type="file"
+                      accept="image/*"
+                      onChange={(event) => setLogoFile(event.target.files?.[0] ?? null)}
+                    />
+                  </div>
+                  <div style={{ display: "grid", gap: 8 }}>
+                    <Label htmlFor="header_image">Header image</Label>
+                    <input
+                      id="header_image"
+                      name="header_image"
+                      type="file"
+                      accept="image/*"
+                      onChange={(event) => setHeaderFile(event.target.files?.[0] ?? null)}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <FilePreview file={logoFile} label="Logo preview" />
+              <FilePreview file={headerFile} label="Header preview" />
+            </div>
+          </section>
+
+          <section
+            style={{
+              display: "grid",
+              gap: 20,
+              gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+            }}
+          >
+            <div
+              style={{
+                background: "#ffffff",
+                border: "1px solid #dbe2ee",
+                borderRadius: 24,
+                padding: 24,
+                display: "grid",
+                gap: 16,
+              }}
+            >
+              <div>
+                <h2 style={{ margin: 0, fontSize: 24 }}>Owner account</h2>
+                <p style={{ marginTop: 8, color: "#475569", lineHeight: 1.6 }}>
+                  This first account becomes the initial business owner and practitioner admin.
+                </p>
+              </div>
+
+              <div style={{ display: "grid", gap: 16 }}>
+                <div style={{ display: "grid", gap: 8 }}>
+                  <Label htmlFor="owner_full_name">Owner full name</Label>
+                  <Input id="owner_full_name" name="owner_full_name" required placeholder="Dr Alex Murphy" />
+                </div>
+                <div style={{ display: "grid", gap: 8 }}>
+                  <Label htmlFor="owner_email">Owner email</Label>
+                  <Input id="owner_email" name="owner_email" type="email" required placeholder="alex@northsideclinic.ie" />
+                </div>
+                <div style={{ display: "grid", gap: 8 }}>
+                  <Label htmlFor="owner_password">Password</Label>
+                  <Input id="owner_password" name="owner_password" type="password" required placeholder="Choose a password" />
+                </div>
+              </div>
+            </div>
+
+            <div
+              style={{
+                background: "#ffffff",
+                border: "1px solid #dbe2ee",
+                borderRadius: 24,
+                padding: 24,
+                display: "grid",
+                gap: 16,
+                alignContent: "space-between",
+              }}
+            >
+              <div>
+                <h2 style={{ margin: 0, fontSize: 24 }}>After signup</h2>
+                <p style={{ marginTop: 8, color: "#475569", lineHeight: 1.6 }}>
+                  You will land in a business dashboard where you can add employees, add patients, upload files,
+                  capture OCR-style context, and manage business settings.
+                </p>
+              </div>
+
+              {error ? <p style={{ margin: 0, color: "#b91c1c", lineHeight: 1.6 }}>{error}</p> : null}
+
+              <div style={{ display: "grid", gap: 12 }}>
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? "Creating workspace..." : "Create Business Workspace"}
+                </Button>
+                <p style={{ margin: 0, fontSize: 14, color: "#64748b" }}>
+                  Already have a workspace?
+                  <Button asChild variant="link" className="px-2">
+                    <Link href="/login">Sign in</Link>
+                  </Button>
+                </p>
+              </div>
+            </div>
+          </section>
+        </form>
+      </div>
+    </main>
   );
 }

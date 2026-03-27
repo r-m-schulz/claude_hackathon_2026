@@ -220,3 +220,94 @@ export type PatientHomeSummary = {
   } | null;
   pending_survey_count: number;
 };
+
+export const BUSINESS_EMPLOYEE_ROLES = ["practitioner", "hr"] as const;
+export type BusinessEmployeeRole = (typeof BUSINESS_EMPLOYEE_ROLES)[number];
+
+export const PATIENT_CONTEXT_ENTRY_TYPES = ["note", "image", "pdf", "file"] as const;
+export type PatientContextEntryType = (typeof PATIENT_CONTEXT_ENTRY_TYPES)[number];
+
+export type BusinessOnboardingAnswers = {
+  care_model: string;
+  patient_volume: string;
+  workflow_needs: string;
+  brand_tone: string;
+  intake_priorities: string;
+};
+
+export type BusinessSummary = {
+  id: string;
+  name: string;
+  legal_name?: string | null;
+  primary_department?: Department | null;
+  support_email?: string | null;
+  phone?: string | null;
+  website?: string | null;
+  address_line?: string | null;
+  city?: string | null;
+  country?: string | null;
+  timezone?: string | null;
+  hero_headline?: string | null;
+  hero_subheadline?: string | null;
+  brand_summary?: string | null;
+  workflow_summary?: string | null;
+  logo_url?: string | null;
+  header_image_url?: string | null;
+  onboarding_answers: BusinessOnboardingAnswers;
+};
+
+export type BusinessEmployeeSummary = {
+  id: string;
+  auth_user_id: string;
+  full_name: string;
+  email: string;
+  role: BusinessEmployeeRole;
+  department?: Department | null;
+  job_title?: string | null;
+  is_owner: boolean;
+  linked_clinician_id?: string | null;
+  created_at: string;
+};
+
+export type BusinessPatientSummary = {
+  id: string;
+  full_name: string;
+  email?: string | null;
+  phone?: string | null;
+  dob: string;
+  department: Department;
+  risk_score: number;
+  risk_tier: RiskTier;
+  created_at: string;
+  is_paired: boolean;
+  paired_at?: string | null;
+  primary_practitioner_name?: string | null;
+};
+
+export type PatientContextEntry = {
+  id: string;
+  entry_type: PatientContextEntryType;
+  title: string;
+  body_text?: string | null;
+  extracted_text?: string | null;
+  file_name?: string | null;
+  mime_type?: string | null;
+  file_url?: string | null;
+  created_at: string;
+  created_by_name?: string | null;
+};
+
+export type BusinessPatientDetail = BusinessPatientSummary & {
+  auth_user_id?: string | null;
+  assigned_practitioner_id?: string | null;
+  assigned_practitioner_name?: string | null;
+  context_entries: PatientContextEntry[];
+};
+
+export type BusinessWorkspaceSummary = {
+  business: BusinessSummary;
+  current_employee: BusinessEmployeeSummary;
+  employees: BusinessEmployeeSummary[];
+  patient_count: number;
+  recent_patients: BusinessPatientSummary[];
+};

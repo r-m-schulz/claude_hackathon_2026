@@ -3,8 +3,8 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "TriageAI",
-  description: "Clinical triage and scheduling platform scaffold",
+  title: "TriageAI Practice Workspace",
+  description: "Business-first clinical workspace for doctors, practitioners, HR, and patient operations.",
 };
 
 type RootLayoutProps = {
