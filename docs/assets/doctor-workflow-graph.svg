@@ -1,0 +1,47 @@
+<svg width="1200" height="420" viewBox="0 0 1200 420" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M0 0L10 5L0 10V0Z" fill="#5B6B7A"/>
+    </marker>
+    <style>
+      .title { font: 700 28px Arial, sans-serif; fill: #122033; }
+      .label { font: 700 18px Arial, sans-serif; fill: #122033; }
+      .sub { font: 400 13px Arial, sans-serif; fill: #5B6B7A; }
+      .line { stroke: #5B6B7A; stroke-width: 3; marker-end: url(#arrow); }
+      .small { font: 700 15px Arial, sans-serif; fill: #0F172A; }
+    </style>
+  </defs>
+
+  <rect width="1200" height="420" rx="28" fill="#F4F7FB"/>
+  <text x="48" y="56" class="title">Doctor Workflow</text>
+
+  <rect x="50" y="150" width="180" height="88" rx="22" fill="#FFFFFF" stroke="#D7E1EA" stroke-width="2"/>
+  <text x="140" y="184" text-anchor="middle" class="label">Patient Info</text>
+  <text x="140" y="208" text-anchor="middle" class="sub">note, survey, or file</text>
+
+  <rect x="290" y="150" width="180" height="88" rx="22" fill="#EEF5FF" stroke="#B7D3F2" stroke-width="2"/>
+  <text x="380" y="184" text-anchor="middle" class="label">Claude</text>
+  <text x="380" y="208" text-anchor="middle" class="sub">extracts and analyzes</text>
+
+  <rect x="530" y="150" width="180" height="88" rx="22" fill="#E8F5F3" stroke="#7CC7BA" stroke-width="2"/>
+  <text x="620" y="184" text-anchor="middle" class="label">Risk Summary</text>
+  <text x="620" y="208" text-anchor="middle" class="sub">score and suggestion</text>
+
+  <polygon points="840,132 930,194 840,256 750,194" fill="#FFF7E9" stroke="#E9C46A" stroke-width="2"/>
+  <text x="840" y="189" text-anchor="middle" class="label">Doctor</text>
+  <text x="840" y="212" text-anchor="middle" class="sub">reviews</text>
+
+  <rect x="980" y="92" width="170" height="82" rx="20" fill="#F2F8F1" stroke="#BFD9B6" stroke-width="2"/>
+  <text x="1065" y="126" text-anchor="middle" class="small">Approve</text>
+  <text x="1065" y="149" text-anchor="middle" class="sub">move forward</text>
+
+  <rect x="980" y="232" width="170" height="82" rx="20" fill="#FFFFFF" stroke="#D7E1EA" stroke-width="2"/>
+  <text x="1065" y="266" text-anchor="middle" class="small">Reject / Modify</text>
+  <text x="1065" y="289" text-anchor="middle" class="sub">human stays in control</text>
+
+  <line x1="230" y1="194" x2="290" y2="194" class="line"/>
+  <line x1="470" y1="194" x2="530" y2="194" class="line"/>
+  <line x1="710" y1="194" x2="750" y2="194" class="line"/>
+  <line x1="930" y1="170" x2="980" y2="133" class="line"/>
+  <line x1="930" y1="218" x2="980" y2="255" class="line"/>
+</svg>

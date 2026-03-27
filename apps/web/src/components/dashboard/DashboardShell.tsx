@@ -7,7 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 import type { BusinessWorkspaceSummary } from "@triageai/shared";
 
 import { apiFetch } from "@/lib/client/api";
-import { createSupabaseBrowserClient } from "@/lib/client/supabase";
+import { createSupabaseBrowserClient, getSupabaseBrowserSession } from "@/lib/client/supabase";
 
 type DashboardShellProps = {
   children: ReactNode;
@@ -36,9 +36,9 @@ export default function DashboardShell({ children }: DashboardShellProps) {
     let isMounted = true;
 
     async function loadWorkspace() {
-      const { data } = await supabase.auth.getSession();
+      const session = await getSupabaseBrowserSession();
 
-      if (!data.session) {
+      if (!session) {
         if (isMounted) {
           router.replace("/login");
         }
@@ -81,7 +81,7 @@ export default function DashboardShell({ children }: DashboardShellProps) {
   }, [router, supabase]);
 
   async function signOut() {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: "local" });
     router.replace("/login");
   }
 

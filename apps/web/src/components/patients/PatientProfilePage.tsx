@@ -3,12 +3,14 @@
 import type { CSSProperties, FormEvent } from "react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import type { BusinessPatientDetail, BusinessWorkspaceSummary } from "@triageai/shared";
+import { useRouter } from "next/navigation";
+import type { BusinessPatientDetail, BusinessWorkspaceSummary, SavePatientNoteResponse } from "@triageai/shared";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { apiFetch } from "@/lib/client/api";
+import { saveLatestCriticalRecommendation } from "@/lib/client/recommendationSession";
 
 const textareaStyle: CSSProperties = {
   width: "100%",
@@ -38,7 +40,52 @@ function formatDate(value: string) {
   });
 }
 
+function buildScheduleHref(response: SavePatientNoteResponse) {
+  if (!response.recommendation) {
+    return null;
+  }
+
+  const search = new URLSearchParams({
+    department: response.recommendation.department,
+    week_start: response.recommendation.week_start,
+    focus_patient_id: response.recommendation.patient_id,
+    focus_patient_name: response.recommendation.patient_name,
+  });
+
+  if (response.recommendation.focused_appointment_id) {
+    search.set("focus_appointment_id", response.recommendation.focused_appointment_id);
+  }
+
+  return `/schedule?${search.toString()}`;
+}
+
+function buildManualScheduleHref(patient: BusinessPatientDetail) {
+  const search = new URLSearchParams({
+    department: patient.department,
+    focus_patient_id: patient.id,
+    focus_patient_name: patient.full_name,
+  });
+
+  return `/schedule?${search.toString()}`;
+}
+
+function getRiskBadgeStyle(riskTier: string | null | undefined) {
+  switch (riskTier) {
+    case "critical":
+      return { background: "#fee2e2", color: "#991b1b", label: "Critical" };
+    case "high":
+      return { background: "#ffedd5", color: "#c2410c", label: "High" };
+    case "medium":
+      return { background: "#fef3c7", color: "#92400e", label: "Medium" };
+    case "low":
+      return { background: "#dcfce7", color: "#166534", label: "Low" };
+    default:
+      return { background: "#e2e8f0", color: "#334155", label: "Unknown" };
+  }
+}
+
 export default function PatientProfilePage({ patientId }: PatientProfilePageProps) {
+  const router = useRouter();
   const [patient, setPatient] = useState<BusinessPatientDetail | null>(null);
   const [workspace, setWorkspace] = useState<BusinessWorkspaceSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -54,6 +101,7 @@ export default function PatientProfilePage({ patientId }: PatientProfilePageProp
   const [savingPair, setSavingPair] = useState(false);
   const [savingDocument, setSavingDocument] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
 
   async function loadData() {
     try {
@@ -80,14 +128,37 @@ export default function PatientProfilePage({ patientId }: PatientProfilePageProp
     event.preventDefault();
     setSavingNote(true);
     setActionError(null);
+    setActionMessage(null);
 
     try {
-      await apiFetch(`/api/business/patients/${patientId}/notes`, {
+      const response = await apiFetch<SavePatientNoteResponse>(`/api/business/patients/${patientId}/notes`, {
         method: "POST",
         body: JSON.stringify(noteState),
       });
 
       setNoteState({ title: "", body_text: "" });
+
+      if (!response.engine_processed) {
+        setActionError(response.engine_error ?? "Note saved, but the critical engine could not complete.");
+        await loadData();
+        return;
+      }
+
+      if (response.recommendation) {
+        saveLatestCriticalRecommendation(response.recommendation);
+        const href = buildScheduleHref(response);
+
+        if (href) {
+          router.push(href);
+          return;
+        }
+      }
+
+      setActionMessage(
+        response.critical_score
+          ? `Note saved. Critical score updated to ${response.critical_score}, but no calendar recommendation was generated.`
+          : "Note saved.",
+      );
       await loadData();
     } catch (submitError) {
       setActionError(submitError instanceof Error ? submitError.message : "Unable to save note.");
@@ -100,6 +171,7 @@ export default function PatientProfilePage({ patientId }: PatientProfilePageProp
     event.preventDefault();
     setSavingPair(true);
     setActionError(null);
+    setActionMessage(null);
 
     try {
       await apiFetch(`/api/business/patients/${patientId}/pair`, {
@@ -120,6 +192,7 @@ export default function PatientProfilePage({ patientId }: PatientProfilePageProp
     event.preventDefault();
     setSavingDocument(true);
     setActionError(null);
+    setActionMessage(null);
 
     try {
       const formData = new FormData();
@@ -164,6 +237,8 @@ export default function PatientProfilePage({ patientId }: PatientProfilePageProp
     );
   }
 
+  const riskBadge = getRiskBadgeStyle(patient.risk_tier);
+
   return (
     <section style={{ display: "grid", gap: 20 }}>
       <header
@@ -197,13 +272,19 @@ export default function PatientProfilePage({ patientId }: PatientProfilePageProp
               minWidth: 220,
             }}
           >
-            <div style={{ fontWeight: 700 }}>{patient.is_paired ? "Patient account paired" : "Portal account pending"}</div>
+            <div style={{ fontWeight: 700 }}>{patient.is_paired ? "Patient account paired" : "Patient account not paired"}</div>
             <div style={{ marginTop: 8, fontSize: 14, lineHeight: 1.6 }}>
               {patient.is_paired
                 ? `Paired on ${patient.paired_at ? formatDate(patient.paired_at) : "recently"}`
-                : "Create the patient login from this page when you are ready."}
+                : "Pair from the profile tools below when needed."}
             </div>
           </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <Button asChild>
+            <Link href={buildManualScheduleHref(patient)}>Book on Calendar</Link>
+          </Button>
         </div>
 
         <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
@@ -234,6 +315,22 @@ export default function PatientProfilePage({ patientId }: PatientProfilePageProp
               Patient status
             </div>
             <div style={{ marginTop: 10, fontWeight: 700 }}>{patient.is_paired ? "Portal ready" : "Business-side only"}</div>
+            <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <span
+                style={{
+                  borderRadius: 999,
+                  padding: "4px 8px",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  textTransform: "uppercase",
+                  background: riskBadge.background,
+                  color: riskBadge.color,
+                }}
+              >
+                {riskBadge.label}
+              </span>
+              <span style={{ fontSize: 13, color: "#334155", fontWeight: 600 }}>Score {patient.risk_score ?? 0}</span>
+            </div>
           </div>
           <div
             style={{
@@ -296,6 +393,20 @@ export default function PatientProfilePage({ patientId }: PatientProfilePageProp
         </section>
       ) : null}
 
+      {actionMessage ? (
+        <section
+          style={{
+            borderRadius: 18,
+            border: "1px solid #bbf7d0",
+            background: "#f0fdf4",
+            padding: 18,
+            color: "#166534",
+          }}
+        >
+          {actionMessage}
+        </section>
+      ) : null}
+
       <section
         style={{
           display: "grid",
@@ -317,7 +428,8 @@ export default function PatientProfilePage({ patientId }: PatientProfilePageProp
           <div>
             <h2 style={{ margin: 0, fontSize: 24 }}>Add note</h2>
             <p style={{ marginTop: 8, color: "#475569", lineHeight: 1.6 }}>
-              Save business-side notes directly onto the patient timeline.
+              Save business-side notes directly onto the patient timeline. The critical engine will recalculate this
+              patient against the rest of the queue and take you straight to the recommended calendar view.
             </p>
           </div>
           <div style={{ display: "grid", gap: 8 }}>

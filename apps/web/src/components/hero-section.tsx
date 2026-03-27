@@ -31,6 +31,16 @@ export default function HeroSection() {
         </section>
       </main>
       <Cta4 />
+
+      <footer className="landing-footer">
+        <div className="landing-footer__left">© 2026 Triage AI</div>
+        <div className="landing-footer__center">Claude Hackathon @ TCD 2026</div>
+        <div className="landing-footer__right">
+          <Link href="https://github.com/r-m-schulz/claude_hackathon_2026" target="_blank" rel="noreferrer">
+            View code
+          </Link>
+        </div>
+      </footer>
     </div>
   );
 }

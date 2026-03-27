@@ -8,7 +8,11 @@ import { LogoIcon } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { createSupabaseBrowserClient } from "@/lib/client/supabase";
+import {
+  clearSupabaseBrowserSession,
+  createSupabaseBrowserClient,
+  getSupabaseBrowserSession,
+} from "@/lib/client/supabase";
 
 const VALUE_POINTS = [
   "Branded business onboarding and settings",
@@ -27,12 +31,18 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) {
+    let isMounted = true;
+
+    getSupabaseBrowserSession().then((session) => {
+      if (isMounted && session) {
         router.replace("/company");
       }
     });
-  }, [router, supabase.auth]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [router]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -47,6 +57,8 @@ export default function LoginPage() {
       setError("Email and password are required.");
       return;
     }
+
+    await clearSupabaseBrowserSession();
 
     const { error: signInError } = await supabase.auth.signInWithPassword({
       email: normalizedEmail,

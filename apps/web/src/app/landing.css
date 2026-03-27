@@ -9,6 +9,8 @@
   background: var(--cream);
   min-height: 100vh;
   color: #0b1220;
+  display: flex;
+  flex-direction: column;
 }
 
 .landing-header {
@@ -196,6 +198,7 @@
 
 .landing-main {
   padding-top: 100px;
+  flex: 1;
 }
 
 .hero-section {
@@ -304,6 +307,39 @@
   .hero-copy-inner {
     padding: 32px 36px;
   }
+}
+
+.landing-footer {
+  margin-top: 40px;
+  background: var(--cream);
+  color: var(--ink);
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 26px 26px 0 0;
+  padding: 18px 24px;
+  display: flex;
+  align-items: center;
+   justify-content: space-between;
+  gap: 16px;
+}
+
+.landing-footer__left {
+  font-size: 14px;
+}
+
+.landing-footer__center {
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.landing-footer__right a {
+  color: #0ea5e9;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.landing-footer__right a:hover {
+  text-decoration: underline;
 }
 
 .info-page {

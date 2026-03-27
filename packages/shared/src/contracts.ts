@@ -191,12 +191,70 @@ export type WeeklyScheduleItem = {
   patient_id: string;
   patient_name: string;
   department: Department;
+  risk_score: number;
+  risk_tier: RiskTier;
   scheduled_at: string;
   original_scheduled_at: string;
   status: AppointmentStatus;
   ai_suggested_date?: string | null;
   suggestion_status?: SuggestionStatus | null;
   is_on_the_day: boolean;
+};
+
+export type ConfirmAppointmentInput = {
+  patient_id: string;
+  scheduled_at: string;
+  appointment_id?: string | null;
+  justification?: string | null;
+};
+
+export type ConfirmAppointmentResponse = {
+  success: boolean;
+  action: "created" | "updated";
+  appointment_id: string;
+  patient_id: string;
+  department: Department;
+  scheduled_at: string;
+};
+
+export type ScheduleRecommendationDirection = "earlier" | "later" | "unchanged";
+
+export type CriticalScheduleChange = {
+  appointment_id: string;
+  patient_id: string;
+  patient_name: string;
+  critical_score: number;
+  risk_tier: RiskTier;
+  from: string;
+  to: string;
+  direction: ScheduleRecommendationDirection;
+  reason: string;
+};
+
+export type CriticalScheduleRecommendation = {
+  patient_id: string;
+  patient_name: string;
+  department: Department;
+  note_id: string;
+  severity_score: number;
+  critical_score: number;
+  risk_tier: RiskTier;
+  focused_appointment_id?: string | null;
+  suggested_at?: string | null;
+  week_start: string;
+  rationale: string;
+  locked_constraints: string[];
+  changes: CriticalScheduleChange[];
+};
+
+export type SavePatientNoteResponse = {
+  success: boolean;
+  clinical_note_id: string;
+  analysis: AIAnalysis | null;
+  engine_processed: boolean;
+  engine_error?: string | null;
+  critical_score?: number | null;
+  recommendation?: CriticalScheduleRecommendation | null;
 };
 
 export type PendingSurveySummary = {

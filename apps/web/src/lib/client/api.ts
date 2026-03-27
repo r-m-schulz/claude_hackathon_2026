@@ -1,9 +1,8 @@
-import { createSupabaseBrowserClient } from "@/lib/client/supabase";
+import { getSupabaseBrowserSession } from "@/lib/client/supabase";
 
 async function getAccessToken() {
-  const supabase = createSupabaseBrowserClient();
-  const { data } = await supabase.auth.getSession();
-  return data.session?.access_token ?? null;
+  const session = await getSupabaseBrowserSession();
+  return session?.access_token ?? null;
 }
 
 export async function apiFetch<T>(input: string, init?: RequestInit) {

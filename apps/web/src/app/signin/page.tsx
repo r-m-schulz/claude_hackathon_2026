@@ -10,7 +10,11 @@ import { LogoIcon } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { createSupabaseBrowserClient } from "@/lib/client/supabase";
+import {
+  clearSupabaseBrowserSession,
+  createSupabaseBrowserClient,
+  getSupabaseBrowserSession,
+} from "@/lib/client/supabase";
 
 const selectStyle: CSSProperties = {
   width: "100%",
@@ -115,49 +119,65 @@ export default function SignupPage() {
   const [headerFile, setHeaderFile] = useState<File | null>(null);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) {
+    let isMounted = true;
+
+    getSupabaseBrowserSession().then((session) => {
+      if (isMounted && session) {
         router.replace("/company");
       }
     });
-  }, [router, supabase.auth]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [router]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
     setError(null);
 
-    const form = event.currentTarget;
-    const formData = new FormData(form);
+    try {
+      const form = event.currentTarget;
+      const formData = new FormData(form);
 
-    const response = await fetch("/api/business/signup", {
-      method: "POST",
-      body: formData,
-    });
+      const response = await fetch("/api/business/signup", {
+        method: "POST",
+        body: formData,
+      });
 
-    const data = (await response.json().catch(() => null)) as { error?: string } | null;
+      const data = (await response.json().catch(() => null)) as { error?: string } | null;
 
-    if (!response.ok) {
+      if (!response.ok) {
+        setError(data?.error ?? "Unable to create the business workspace.");
+        return;
+      }
+
+      const ownerEmail = String(formData.get("owner_email") ?? "").trim().toLowerCase();
+      const ownerPassword = String(formData.get("owner_password") ?? "");
+      await clearSupabaseBrowserSession();
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: ownerEmail,
+        password: ownerPassword,
+      });
+
+      if (signInError) {
+        setError(signInError.message);
+        return;
+      }
+
+      router.replace("/company");
+    } catch (submitError) {
+      setError(
+        submitError instanceof Error && submitError.message
+          ? submitError.message === "Failed to fetch"
+            ? "Unable to reach the signup service. Check that the server is running and the latest database migrations are applied."
+            : submitError.message
+          : "Unable to create the business workspace.",
+      );
+    } finally {
       setLoading(false);
-      setError(data?.error ?? "Unable to create the business workspace.");
-      return;
     }
-
-    const ownerEmail = String(formData.get("owner_email") ?? "");
-    const ownerPassword = String(formData.get("owner_password") ?? "");
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: ownerEmail,
-      password: ownerPassword,
-    });
-
-    setLoading(false);
-
-    if (signInError) {
-      setError(signInError.message);
-      return;
-    }
-
-    router.replace("/company");
   }
 
   return (
