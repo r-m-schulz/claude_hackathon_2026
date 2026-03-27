@@ -5,6 +5,9 @@
     "scheme": "triageai",
     "version": "0.1.0",
     "orientation": "portrait",
+    "updates": {
+      "enabled": false
+    },
     "plugins": [
       "expo-router"
     ]
