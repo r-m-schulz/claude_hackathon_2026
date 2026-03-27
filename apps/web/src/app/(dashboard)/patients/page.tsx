@@ -181,6 +181,7 @@ export default function PatientsPage() {
           display: "grid",
           gap: 20,
           gridTemplateColumns: "minmax(0, 1.15fr) minmax(320px, 0.85fr)",
+          alignItems: "stretch",
         }}
       >
         <article
@@ -189,8 +190,10 @@ export default function PatientsPage() {
             border: "1px solid #dbe2ee",
             borderRadius: 24,
             padding: 24,
-            display: "grid",
+            display: "flex",
+            flexDirection: "column",
             gap: 16,
+            height: "100%",
           }}
         >
           <div>
@@ -200,7 +203,7 @@ export default function PatientsPage() {
             </p>
           </div>
 
-          <div style={{ display: "grid", gap: 12 }}>
+          <div style={{ display: "grid", gap: 12, flex: 1, alignContent: "start" }}>
             {patients.length === 0 ? (
               <div
                 style={{
