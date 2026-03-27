@@ -17,7 +17,30 @@ type ProcessClinicalNoteInput = AnalyseClinicalNoteInput & {
 export async function analyseClinicalNoteContent({
   department,
   content,
-}: AnalyseClinicalNoteInput): Promise<AIAnalysis> {
+  patientId,
+}: AnalyseClinicalNoteInput & { patientId: string }): Promise<AIAnalysis> {
+  const supabase = createSupabaseServerClient();
+  const [{ data: patient }, { data: contextEntries }] = await Promise.all([
+    supabase
+      .from("patients")
+      .select("full_name, risk_score, risk_tier")
+      .eq("id", patientId)
+      .maybeSingle(),
+    supabase
+      .from("patient_context_entries")
+      .select("entry_type, title, body_text, extracted_text, created_at")
+      .eq("patient_id", patientId)
+      .order("created_at", { ascending: false })
+      .limit(4),
+  ]);
+
+  const recentContext = (contextEntries ?? [])
+    .map((entry) => {
+      const body = entry.body_text || entry.extracted_text || "";
+      return `[${entry.entry_type}] ${entry.title}: ${body}`.trim();
+    })
+    .join("\n---\n") || "No recent context available.";
+
   const response = await claude.messages.create({
     model: MODEL,
     max_tokens: 1024,
@@ -37,7 +60,14 @@ No preamble. Raw JSON only.`,
     messages: [
       {
         role: "user",
-        content: `Clinical note:\n${content}`,
+        content: `Patient name: ${patient?.full_name ?? "Unknown patient"}
+Current critical score: ${patient?.risk_score ?? 0}
+Current risk tier: ${patient?.risk_tier ?? "low"}
+Recent patient context:
+${recentContext}
+
+New clinical note:
+${content}`,
       },
     ],
   });
@@ -52,7 +82,7 @@ export async function processClinicalNote({
   department,
   content,
 }: ProcessClinicalNoteInput): Promise<AIAnalysis> {
-  const analysis = await analyseClinicalNoteContent({ department, content });
+  const analysis = await analyseClinicalNoteContent({ department, content, patientId });
   const supabase = createSupabaseServerClient();
   const { error } = await supabase
     .from("clinical_notes")

@@ -2,7 +2,6 @@
 
 import type { WeeklyScheduleItem } from "@triageai/shared";
 import Link from "next/link";
-import { useState } from "react";
 
 // ── config ──────────────────────────────────────────────────────────────────
 const START_HOUR = 7;   // 7 am
@@ -49,14 +48,66 @@ const BADGE: Record<string, { bg: string; color: string }> = {
   rejected: { bg: "#fee2e2", color: "#991b1b" },
 };
 
+function getRecommendationDirection(item: WeeklyScheduleItem) {
+  if (!item.ai_suggested_date) {
+    return null;
+  }
+
+  const suggested = new Date(item.ai_suggested_date).getTime();
+  const scheduled = new Date(item.scheduled_at).getTime();
+
+  if (suggested < scheduled) {
+    return "earlier";
+  }
+
+  if (suggested > scheduled) {
+    return "later";
+  }
+
+  return "same";
+}
+
 // ── appointment card (absolutely positioned) ──────────────────────────────
-function AppointmentCard({ item, top }: { item: WeeklyScheduleItem; top: number }) {
-  const time = new Date(item.scheduled_at).toLocaleTimeString("en-US", {
+function AppointmentCard({
+  item,
+  top,
+  slotAt,
+  variant,
+  highlighted,
+}: {
+  item: WeeklyScheduleItem;
+  top: number;
+  slotAt: string;
+  variant: "scheduled" | "recommended";
+  highlighted: boolean;
+}) {
+  const time = new Date(slotAt).toLocaleTimeString("en-US", {
     hour: "numeric",
     minute: "2-digit",
   });
   const badge = item.suggestion_status ? BADGE[item.suggestion_status] : null;
   const onDay  = item.is_on_the_day;
+  const direction = getRecommendationDirection(item);
+  const isRecommended = variant === "recommended";
+  const background = isRecommended
+    ? direction === "later"
+      ? "#fff7ed"
+      : "#ecfeff"
+    : onDay
+      ? "#fff7ed"
+      : "#f0f9ff";
+  const border = isRecommended
+    ? direction === "later"
+      ? "1.5px dashed #fb923c"
+      : "1.5px dashed #14b8a6"
+    : onDay
+      ? "1.5px solid #f97316"
+      : "1.5px solid #bae6fd";
+  const boxShadow = highlighted
+    ? "0 0 0 3px rgba(37, 99, 235, 0.18), 0 18px 30px rgba(15, 23, 42, 0.14)"
+    : isRecommended
+      ? "0 12px 24px rgba(20, 184, 166, 0.14)"
+      : undefined;
 
   return (
     <Link
@@ -72,8 +123,9 @@ function AppointmentCard({ item, top }: { item: WeeklyScheduleItem; top: number 
           height: CARD_H,
           borderRadius: 8,
           padding: "5px 8px",
-          background: onDay ? "#fff7ed" : "#f0f9ff",
-          border: onDay ? "1.5px solid #f97316" : "1.5px solid #bae6fd",
+          background,
+          border,
+          boxShadow,
           overflow: "hidden",
           cursor: "pointer",
           boxSizing: "border-box",
@@ -108,6 +160,18 @@ function AppointmentCard({ item, top }: { item: WeeklyScheduleItem; top: number 
           {item.department.replaceAll("_", " ")}
         </div>
         <div style={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
+          <span
+            style={{
+              fontSize: 9,
+              fontWeight: 700,
+              padding: "1px 5px",
+              borderRadius: 99,
+              background: isRecommended ? "#dbeafe" : "#e2e8f0",
+              color: isRecommended ? "#1d4ed8" : "#475569",
+            }}
+          >
+            {isRecommended ? "recommended" : "current"}
+          </span>
           {badge && (
             <span
               style={{
@@ -136,6 +200,18 @@ function AppointmentCard({ item, top }: { item: WeeklyScheduleItem; top: number 
               on-day
             </span>
           )}
+          <span
+            style={{
+              fontSize: 9,
+              fontWeight: 700,
+              padding: "1px 5px",
+              borderRadius: 99,
+              background: "#ffffff",
+              color: "#0f172a",
+            }}
+          >
+            {item.risk_tier} {item.risk_score}
+          </span>
         </div>
       </div>
     </Link>
@@ -143,14 +219,19 @@ function AppointmentCard({ item, top }: { item: WeeklyScheduleItem; top: number 
 }
 
 // ── main component ────────────────────────────────────────────────────────
-export default function WeeklySchedule({ items }: { items: WeeklyScheduleItem[] }) {
-  const defaultWeek =
-    items.length > 0
-      ? getWeekStart(new Date(items[0].scheduled_at))
-      : getWeekStart(new Date());
-
-  const [weekStart, setWeekStart] = useState(defaultWeek);
-
+export default function WeeklySchedule({
+  items,
+  weekStart,
+  onWeekChange,
+  highlightedAppointmentId,
+  highlightedPatientId,
+}: {
+  items: WeeklyScheduleItem[];
+  weekStart: Date;
+  onWeekChange: (weekStart: Date) => void;
+  highlightedAppointmentId?: string | null;
+  highlightedPatientId?: string | null;
+}) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -190,11 +271,11 @@ export default function WeeklySchedule({ items }: { items: WeeklyScheduleItem[] 
 
       {/* ── week navigation ── */}
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <button style={navBtn} onClick={() => setWeekStart(addDays(weekStart, -7))}>‹</button>
-        <button style={navBtn} onClick={() => setWeekStart(addDays(weekStart, 7))}>›</button>
+        <button style={navBtn} onClick={() => onWeekChange(addDays(weekStart, -7))}>‹</button>
+        <button style={navBtn} onClick={() => onWeekChange(addDays(weekStart, 7))}>›</button>
         <span style={{ fontWeight: 600, color: "#0f172a", fontSize: 15 }}>{weekLabel}</span>
         <button
-          onClick={() => setWeekStart(getWeekStart(new Date()))}
+          onClick={() => onWeekChange(getWeekStart(new Date()))}
           style={{
             marginLeft: 4,
             padding: "4px 12px",
@@ -341,10 +422,44 @@ export default function WeeklySchedule({ items }: { items: WeeklyScheduleItem[] 
                   {/* appointment cards */}
                   {itemsByDay[i].map((item) => {
                     const top = topForDate(new Date(item.scheduled_at));
+                    const isHighlighted =
+                      item.appointment_id === highlightedAppointmentId || item.patient_id === highlightedPatientId;
+
                     return (
-                      <AppointmentCard key={item.appointment_id} item={item} top={top} />
+                      <AppointmentCard
+                        key={`${item.appointment_id}-scheduled`}
+                        item={item}
+                        top={top}
+                        slotAt={item.scheduled_at}
+                        variant="scheduled"
+                        highlighted={isHighlighted}
+                      />
                     );
                   })}
+
+                  {items
+                    .filter(
+                      (item) =>
+                        item.ai_suggested_date &&
+                        item.ai_suggested_date !== item.scheduled_at &&
+                        isSameDay(new Date(item.ai_suggested_date), day),
+                    )
+                    .map((item) => {
+                      const top = topForDate(new Date(item.ai_suggested_date as string));
+                      const isHighlighted =
+                        item.appointment_id === highlightedAppointmentId || item.patient_id === highlightedPatientId;
+
+                      return (
+                        <AppointmentCard
+                          key={`${item.appointment_id}-recommended`}
+                          item={item}
+                          top={top}
+                          slotAt={item.ai_suggested_date as string}
+                          variant="recommended"
+                          highlighted={isHighlighted}
+                        />
+                      );
+                    })}
                 </div>
               );
             })}

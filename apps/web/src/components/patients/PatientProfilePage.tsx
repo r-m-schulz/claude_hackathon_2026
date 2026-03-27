@@ -3,12 +3,14 @@
 import type { CSSProperties, FormEvent } from "react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import type { BusinessPatientDetail, BusinessWorkspaceSummary } from "@triageai/shared";
+import { useRouter } from "next/navigation";
+import type { BusinessPatientDetail, BusinessWorkspaceSummary, SavePatientNoteResponse } from "@triageai/shared";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { apiFetch } from "@/lib/client/api";
+import { saveLatestCriticalRecommendation } from "@/lib/client/recommendationSession";
 
 const textareaStyle: CSSProperties = {
   width: "100%",
@@ -28,23 +30,6 @@ type PatientProfilePageProps = {
   patientId: string;
 };
 
-type SaveNoteResponse = {
-  success: boolean;
-  clinical_note_id?: string | null;
-  engine_processed?: boolean;
-  engine_error?: string | null;
-};
-
-type AppointmentRecommendationResponse = {
-  success: boolean;
-  message: string;
-};
-
-type RecommendationPromptState = {
-  noteId: string | null;
-  fallbackMessage: string;
-};
-
 function formatDate(value: string) {
   return new Date(value).toLocaleString("en-IE", {
     day: "numeric",
@@ -55,118 +40,26 @@ function formatDate(value: string) {
   });
 }
 
-function AppointmentRecommendationModal({
-  patientName,
-  pending,
-  onDismiss,
-  onConfirm,
-}: {
-  patientName: string;
-  pending: boolean;
-  onDismiss: () => void;
-  onConfirm: () => void;
-}) {
-  return (
-    <div
-      aria-modal="true"
-      role="dialog"
-      aria-labelledby="appointment_recommendation_title"
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 80,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 24,
-        background: "rgba(15, 23, 42, 0.48)",
-        backdropFilter: "blur(10px)",
-      }}
-    >
-      <div
-        style={{
-          width: "min(100%, 520px)",
-          borderRadius: 30,
-          overflow: "hidden",
-          border: "1px solid rgba(148, 163, 184, 0.28)",
-          background:
-            "linear-gradient(180deg, rgba(239, 246, 255, 0.96) 0%, rgba(255, 255, 255, 0.98) 38%, rgba(248, 250, 252, 0.98) 100%)",
-          boxShadow: "0 28px 90px rgba(15, 23, 42, 0.22)",
-        }}
-      >
-        <div
-          style={{
-            padding: 24,
-            background:
-              "linear-gradient(135deg, rgba(14, 116, 144, 0.16) 0%, rgba(37, 99, 235, 0.08) 50%, rgba(255, 255, 255, 0) 100%)",
-            borderBottom: "1px solid rgba(226, 232, 240, 0.85)",
-          }}
-        >
-          <div
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "8px 12px",
-              borderRadius: 999,
-              background: "rgba(255, 255, 255, 0.8)",
-              border: "1px solid rgba(148, 163, 184, 0.24)",
-              color: "#0f172a",
-              fontSize: 12,
-              fontWeight: 700,
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-            }}
-          >
-            Scheduling Review
-          </div>
-          <h3 id="appointment_recommendation_title" style={{ margin: "18px 0 0", fontSize: 28, lineHeight: 1.15 }}>
-            Does this patient need to be scheduled for an appointment?
-          </h3>
-          <p style={{ margin: "12px 0 0", color: "#475569", fontSize: 16, lineHeight: 1.7 }}>
-            The note for <strong style={{ color: "#172033" }}>{patientName}</strong> has been saved. If follow-up is
-            needed, create a scheduling recommendation now so the patient appears in the review workflow.
-          </p>
-        </div>
+function buildScheduleHref(response: SavePatientNoteResponse) {
+  if (!response.recommendation) {
+    return null;
+  }
 
-        <div style={{ padding: 24, display: "grid", gap: 18 }}>
-          <div
-            style={{
-              borderRadius: 20,
-              border: "1px solid #dbeafe",
-              background: "#f8fbff",
-              padding: 18,
-              color: "#334155",
-              lineHeight: 1.65,
-            }}
-          >
-            Choosing <strong style={{ color: "#172033" }}>Recommend appointment</strong> will flag the patient for
-            scheduling review and suggest an earlier slot when an existing appointment can be safely brought forward.
-          </div>
+  const search = new URLSearchParams({
+    department: response.recommendation.department,
+    week_start: response.recommendation.week_start,
+    focus_patient_id: response.recommendation.patient_id,
+  });
 
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, flexWrap: "wrap" }}>
-            <Button type="button" variant="outline" onClick={onDismiss} disabled={pending}>
-              Not now
-            </Button>
-            <Button
-              type="button"
-              onClick={onConfirm}
-              disabled={pending}
-              style={{
-                background: "linear-gradient(135deg, #0f766e 0%, #1d4ed8 100%)",
-                boxShadow: "0 14px 30px rgba(29, 78, 216, 0.24)",
-              }}
-            >
-              {pending ? "Creating recommendation..." : "Recommend appointment"}
-            </Button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  if (response.recommendation.focused_appointment_id) {
+    search.set("focus_appointment_id", response.recommendation.focused_appointment_id);
+  }
+
+  return `/schedule?${search.toString()}`;
 }
 
 export default function PatientProfilePage({ patientId }: PatientProfilePageProps) {
+  const router = useRouter();
   const [patient, setPatient] = useState<BusinessPatientDetail | null>(null);
   const [workspace, setWorkspace] = useState<BusinessWorkspaceSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -181,10 +74,8 @@ export default function PatientProfilePage({ patientId }: PatientProfilePageProp
   const [savingNote, setSavingNote] = useState(false);
   const [savingPair, setSavingPair] = useState(false);
   const [savingDocument, setSavingDocument] = useState(false);
-  const [savingRecommendation, setSavingRecommendation] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
-  const [recommendationPrompt, setRecommendationPrompt] = useState<RecommendationPromptState | null>(null);
 
   async function loadData() {
     try {
@@ -212,70 +103,41 @@ export default function PatientProfilePage({ patientId }: PatientProfilePageProp
     setSavingNote(true);
     setActionError(null);
     setActionMessage(null);
-    setRecommendationPrompt(null);
-
-    let noteSaved = false;
 
     try {
-      const response = await apiFetch<SaveNoteResponse>(`/api/business/patients/${patientId}/notes`, {
+      const response = await apiFetch<SavePatientNoteResponse>(`/api/business/patients/${patientId}/notes`, {
         method: "POST",
         body: JSON.stringify(noteState),
       });
-      noteSaved = true;
-
-      let message = response.engine_processed === false && response.engine_error
-        ? `Note saved, but note analysis failed: ${response.engine_error}`
-        : "Note saved.";
 
       setNoteState({ title: "", body_text: "" });
+
+      if (!response.engine_processed) {
+        setActionError(response.engine_error ?? "Note saved, but the critical engine could not complete.");
+        await loadData();
+        return;
+      }
+
+      if (response.recommendation) {
+        saveLatestCriticalRecommendation(response.recommendation);
+        const href = buildScheduleHref(response);
+
+        if (href) {
+          router.push(href);
+          return;
+        }
+      }
+
+      setActionMessage(
+        response.critical_score
+          ? `Note saved. Critical score updated to ${response.critical_score}, but no calendar recommendation was generated.`
+          : "Note saved.",
+      );
       await loadData();
-      setRecommendationPrompt({
-        noteId: response.clinical_note_id ?? null,
-        fallbackMessage: message,
-      });
     } catch (submitError) {
-      const errorMessage = submitError instanceof Error ? submitError.message : "Unable to save note.";
-      setActionError(noteSaved ? `Note saved, but a follow-up action failed: ${errorMessage}` : errorMessage);
+      setActionError(submitError instanceof Error ? submitError.message : "Unable to save note.");
     } finally {
       setSavingNote(false);
-    }
-  }
-
-  async function onDismissRecommendationPrompt() {
-    if (!recommendationPrompt) {
-      return;
-    }
-
-    setRecommendationPrompt(null);
-    setActionMessage(recommendationPrompt.fallbackMessage);
-  }
-
-  async function onConfirmRecommendationPrompt() {
-    if (!recommendationPrompt) {
-      return;
-    }
-
-    setSavingRecommendation(true);
-    setActionError(null);
-
-    try {
-      const recommendation = await apiFetch<AppointmentRecommendationResponse>(
-        `/api/business/patients/${patientId}/appointment-recommendation`,
-        {
-          method: "POST",
-          body: JSON.stringify({ note_id: recommendationPrompt.noteId }),
-        },
-      );
-
-      setRecommendationPrompt(null);
-      setActionMessage(recommendation.message);
-      await loadData();
-    } catch (submitError) {
-      const errorMessage =
-        submitError instanceof Error ? submitError.message : "Unable to create appointment recommendation.";
-      setActionError(`Note saved, but a follow-up action failed: ${errorMessage}`);
-    } finally {
-      setSavingRecommendation(false);
     }
   }
 
@@ -351,15 +213,6 @@ export default function PatientProfilePage({ patientId }: PatientProfilePageProp
 
   return (
     <section style={{ display: "grid", gap: 20 }}>
-      {recommendationPrompt ? (
-        <AppointmentRecommendationModal
-          patientName={patient.full_name}
-          pending={savingRecommendation}
-          onDismiss={onDismissRecommendationPrompt}
-          onConfirm={onConfirmRecommendationPrompt}
-        />
-      ) : null}
-
       <header
         style={{
           borderRadius: 24,
@@ -494,8 +347,8 @@ export default function PatientProfilePage({ patientId }: PatientProfilePageProp
           <div>
             <h2 style={{ margin: 0, fontSize: 24 }}>Add note</h2>
             <p style={{ marginTop: 8, color: "#475569", lineHeight: 1.6 }}>
-              Save business-side notes directly onto the patient timeline. After saving, you will be asked whether the
-              patient should be recommended for an appointment.
+              Save business-side notes directly onto the patient timeline. The critical engine will recalculate this
+              patient against the rest of the queue and take you straight to the recommended calendar view.
             </p>
           </div>
           <div style={{ display: "grid", gap: 8 }}>

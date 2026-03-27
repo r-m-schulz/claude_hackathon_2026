@@ -1,8 +1,10 @@
+import type { Department, SavePatientNoteResponse } from "@triageai/shared";
+
+import { runCriticalSchedulingEngine } from "@/lib/criticalScheduling";
 import { requireBusinessContext } from "@/lib/server/businessAuth";
 import { jsonErrorResponse, HttpError } from "@/lib/server/http";
 import { createSupabaseServerClient } from "@/lib/server/supabase";
 import { processClinicalNote } from "@/lib/noteAnalysis";
-import type { Department } from "@triageai/shared";
 
 type CreateNoteBody = {
   title?: string;
@@ -77,6 +79,7 @@ export async function POST(req: Request, { params }: RouteContext) {
     }
 
     let analysis = null;
+    let recommendation = null;
     let engineError: string | null = null;
 
     try {
@@ -85,6 +88,13 @@ export async function POST(req: Request, { params }: RouteContext) {
         patientId,
         department: patient.department as Department,
         content: noteText,
+      });
+
+      recommendation = await runCriticalSchedulingEngine({
+        businessId: context.businessId,
+        patientId,
+        noteId: clinicalNote.id as string,
+        noteAnalysis: analysis,
       });
     } catch (error) {
       engineError = error instanceof Error ? error.message : "Unknown note-analysis error.";
@@ -96,19 +106,25 @@ export async function POST(req: Request, { params }: RouteContext) {
         status: analysis ? "processed" : "failed",
         processed_at: new Date().toISOString(),
         ai_summary: analysis,
+        critical_score: recommendation?.critical_score ?? null,
+        schedule_recommendation: recommendation,
         error: engineError,
       },
     };
 
     await supabase.from("patient_context_entries").update({ metadata }).eq("id", contextEntry.id);
 
-    return Response.json({
+    const response: SavePatientNoteResponse = {
       success: true,
-      clinical_note_id: clinicalNote.id,
+      clinical_note_id: clinicalNote.id as string,
       analysis,
       engine_processed: Boolean(analysis),
       engine_error: engineError,
-    });
+      critical_score: recommendation?.critical_score ?? null,
+      recommendation,
+    };
+
+    return Response.json(response);
   } catch (error) {
     return jsonErrorResponse(error, "Unable to save note.");
   }
