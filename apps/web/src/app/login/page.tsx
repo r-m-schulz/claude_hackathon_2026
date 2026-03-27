@@ -18,11 +18,10 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Force a fresh login each time the page is opened.
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) router.replace("/");
-    });
-  }, [router, supabase.auth]);
+    supabase.auth.signOut();
+  }, [supabase.auth]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -41,7 +40,7 @@ export default function LoginPage() {
       return;
     }
 
-    router.replace("/");
+    router.replace("/triage");
   }
 
   return (
