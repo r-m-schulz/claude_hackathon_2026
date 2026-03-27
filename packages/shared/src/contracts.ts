@@ -1,3 +1,50 @@
+// ============================================================
+// Auth / Registration
+// ============================================================
+
+export const CLINICIAN_ROLES = ["clinician", "consultant", "admin"] as const;
+export type ClinicianRole = (typeof CLINICIAN_ROLES)[number];
+
+/**
+ * Onboarding status for patients.
+ * Currently all patients default to "active" — reserved for future
+ * one-time-code gating (patient onboarding code will gate patient
+ * activation later without breaking this contract).
+ */
+export const ONBOARDING_STATUSES = ["active", "unverified"] as const;
+export type OnboardingStatus = (typeof ONBOARDING_STATUSES)[number];
+
+export type RegisterInput =
+  | {
+      role: "clinician";
+      email: string;
+      password: string;
+      full_name: string;
+      department: Department;
+      clinician_role?: ClinicianRole; // defaults to "clinician"
+    }
+  | {
+      role: "patient";
+      email: string;
+      password: string;
+      full_name: string;
+      department: Department;
+      dob: string; // ISO date YYYY-MM-DD
+      // Future: onboarding_code?: string (not enforced yet)
+    };
+
+export type RegisterResponse = {
+  success: boolean;
+  user_id?: string;
+  role?: "clinician" | "patient";
+  profile_created: boolean;
+  message: string;
+};
+
+// ============================================================
+// Departments
+// ============================================================
+
 export const DEPARTMENTS = [
   "orthopaedics",
   "dermatology",
