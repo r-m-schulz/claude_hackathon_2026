@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "name": "TriageAI",
+    "slug": "triageai",
+    "scheme": "triageai",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "plugins": [
+      "expo-router"
+    ]
+  }
+}
