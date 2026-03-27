@@ -1,0 +1,205 @@
+:root {
+  --radius: 0.75rem;
+  --color-zinc-900: #18181b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  background: #f5f7fb;
+  color: #172033;
+}
+
+.bg-zinc-50 {
+  background: #fafafa;
+}
+
+.bg-transparent {
+  background: transparent;
+}
+
+.bg-card {
+  background: #ffffff;
+}
+
+.bg-muted {
+  background: #f4f4f5;
+}
+
+.text-accent-foreground {
+  color: #27272a;
+}
+
+.text-sm {
+  font-size: 0.875rem;
+  line-height: 1.35rem;
+}
+
+.text-xl {
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+}
+
+.font-semibold {
+  font-weight: 600;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.block {
+  display: block;
+}
+
+.w-full {
+  width: 100%;
+}
+
+.max-w-sm {
+  max-width: 24rem;
+}
+
+.h-fit {
+  height: fit-content;
+}
+
+.min-h-screen {
+  min-height: 100vh;
+}
+
+.m-auto {
+  margin: auto;
+}
+
+.mt-4 {
+  margin-top: 1rem;
+}
+
+.mt-6 {
+  margin-top: 1.5rem;
+}
+
+.mb-1 {
+  margin-bottom: 0.25rem;
+}
+
+.my-4 {
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+}
+
+.px-2 {
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+}
+
+.px-4 {
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+.p-0\.5 {
+  padding: 0.125rem;
+}
+
+.p-3 {
+  padding: 0.75rem;
+}
+
+.p-8 {
+  padding: 2rem;
+}
+
+.pb-6 {
+  padding-bottom: 1.5rem;
+}
+
+.py-16 {
+  padding-top: 4rem;
+  padding-bottom: 4rem;
+}
+
+.grid {
+  display: grid;
+}
+
+.grid-cols-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.gap-3 {
+  gap: 0.75rem;
+}
+
+.space-y-0\.5 > * + * {
+  margin-top: 0.125rem;
+}
+
+.space-y-2 > * + * {
+  margin-top: 0.5rem;
+}
+
+.space-y-5 > * + * {
+  margin-top: 1.25rem;
+}
+
+.space-y-6 > * + * {
+  margin-top: 1.5rem;
+}
+
+.flex {
+  display: flex;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.justify-between {
+  justify-content: space-between;
+}
+
+.border {
+  border: 1px solid #e4e4e7;
+}
+
+.border-dashed {
+  border-style: dashed;
+}
+
+.rounded-\(--radius\) {
+  border-radius: var(--radius);
+}
+
+.rounded-\[calc\(var\(--radius\)\+\.125rem\)\] {
+  border-radius: calc(var(--radius) + 0.125rem);
+}
+
+.shadow-md {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+@media (min-width: 768px) {
+  .md\:py-32 {
+    padding-top: 8rem;
+    padding-bottom: 8rem;
+  }
+}
+
+a {
+  color: inherit;
+}
+
+input {
+  width: 100%;
+}
