@@ -235,19 +235,39 @@ export default function PatientsPage() {
                         {patient.department.replaceAll("_", " ")} | {patient.primary_practitioner_name ?? "Unassigned"}
                       </div>
                     </div>
-                    <div
-                      style={{
-                        borderRadius: 999,
-                        padding: "6px 10px",
-                        fontSize: 12,
-                        fontWeight: 700,
-                        textTransform: "uppercase",
-                        background: patient.is_paired ? "#dcfce7" : "#fef3c7",
-                        color: patient.is_paired ? "#166534" : "#92400e",
-                        alignSelf: "start",
-                      }}
-                    >
-                      {patient.is_paired ? "Paired" : "Unpaired"}
+                    <div style={{ display: "flex", gap: 8, alignSelf: "start", flexWrap: "wrap" }}>
+                      <div
+                        style={{
+                          borderRadius: 999,
+                          padding: "6px 10px",
+                          fontSize: 12,
+                          fontWeight: 700,
+                          textTransform: "uppercase",
+                          background: patient.is_paired ? "#dcfce7" : "#fef3c7",
+                          color: patient.is_paired ? "#166534" : "#92400e",
+                        }}
+                      >
+                        {patient.is_paired ? "Paired" : "Unpaired"}
+                      </div>
+                      <div
+                        style={{
+                          borderRadius: 999,
+                          padding: "6px 10px",
+                          fontSize: 12,
+                          fontWeight: 700,
+                          textTransform: "uppercase",
+                          background:
+                            patient.risk_tier === "critical" ? "#fef2f2" :
+                            patient.risk_tier === "high" ? "#fff7ed" :
+                            patient.risk_tier === "medium" ? "#fefce8" : "#f0fdf4",
+                          color:
+                            patient.risk_tier === "critical" ? "#991b1b" :
+                            patient.risk_tier === "high" ? "#c2410c" :
+                            patient.risk_tier === "medium" ? "#854d0e" : "#166534",
+                        }}
+                      >
+                        {patient.risk_tier} · {patient.risk_score}
+                      </div>
                     </div>
                   </div>
 
