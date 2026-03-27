@@ -1,4 +1,5 @@
 import type { SurveyQuestion, SurveyResponseItem } from "@triageai/shared";
+import { ACTIVE_APPOINTMENT_STATUSES } from "@/lib/scheduling";
 import { createSupabaseServerClient } from "@/lib/server/supabase";
 
 function evaluateFlag(
@@ -61,7 +62,7 @@ export async function escalatePsychiatricCrisis(
       .from("appointments")
       .update({ is_on_the_day: true, suggestion_status: "pending" })
       .eq("patient_id", patient_id)
-      .eq("status", "scheduled"),
+      .in("status", [...ACTIVE_APPOINTMENT_STATUSES]),
   ]);
 
   // 4. Notify on-call psychiatrist (stubbed — implement with Expo Push or similar)

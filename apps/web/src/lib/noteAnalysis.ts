@@ -56,6 +56,12 @@ Assess the clinical significance and return ONLY valid JSON:
   "reasoning": <string>,
   "scoring_framework_used": "Clinical Note Analysis"
 }
+Use the full severity range rather than clustering near zero:
+- 0-25: stable / administrative / minimal clinical concern
+- 26-50: active issue needing follow-up
+- 51-75: worsening symptoms or clear clinician concern that should prompt earlier review
+- 76-100: urgent or critical deterioration, red flags, or same-day escalation concern
+When the note documents worsening symptoms, failed treatment, recurrent flare, red flags, or clinician concern about earlier review, bias the score upward rather than conservative.
 No preamble. Raw JSON only.`,
     messages: [
       {

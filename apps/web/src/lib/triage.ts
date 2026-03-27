@@ -1,17 +1,9 @@
 import type { RiskTier, SuggestedAction } from "@triageai/shared";
+import { loadLatestNoteScoreMap, scoreToTier } from "@/lib/noteSeverity";
 import { createSupabaseServerClient } from "@/lib/server/supabase";
 import { createAppointmentSuggestion } from "@/lib/scheduling";
 
 type TriggerType = "scan" | "survey" | "note" | "manual";
-
-const WEIGHTS = { scan: 0.4, survey: 0.35, notes: 0.25 };
-
-function scoreToTier(score: number): RiskTier {
-  if (score <= 30) return "low";
-  if (score <= 55) return "medium";
-  if (score <= 80) return "high";
-  return "critical";
-}
 
 function tierToAction(tier: RiskTier): SuggestedAction {
   const map: Record<RiskTier, SuggestedAction> = {
@@ -31,7 +23,7 @@ function generateReasoning(
   const delta = newScore - previousScore;
   const direction = delta > 0 ? `increased by ${delta}` : delta < 0 ? `decreased by ${Math.abs(delta)}` : "unchanged";
   const tier = scoreToTier(newScore);
-  return `Risk score ${direction} to ${newScore} (${tier}) following ${triggerType} analysis. Weighted aggregation: scan 40%, survey 35%, clinical notes 25%.`;
+  return `Risk score ${direction} to ${newScore} (${tier}) following ${triggerType} analysis. Notes can fully reset the active patient score, while scan and survey signals can raise the live score immediately so the scheduler can suggest earlier return slots or create a new follow-up recommendation.`;
 }
 
 export async function triggerTriageEvaluation(
@@ -44,56 +36,18 @@ export async function triggerTriageEvaluation(
 
   const { data: patient } = await supabase
     .from("patients")
-    .select("risk_score, risk_tier, department")
+    .select("risk_score, risk_tier")
     .eq("id", patient_id)
     .single();
 
   if (!patient) throw new Error(`Patient not found: ${patient_id}`);
 
-  // Fetch latest scores from each data source in parallel
-  const [latestScanResult, latestSurveyResult, latestNotesResult] = await Promise.all([
-    supabase
-      .from("scans_and_images")
-      .select("ai_analysis")
-      .eq("patient_id", patient_id)
-      .not("ai_analysis", "is", null)
-      .order("analysed_at", { ascending: false })
-      .limit(1)
-      .single(),
-
-    supabase
-      .from("surveys")
-      .select("ai_analysis")
-      .eq("patient_id", patient_id)
-      .not("ai_analysis", "is", null)
-      .order("completed_at", { ascending: false })
-      .limit(1)
-      .single(),
-
-    supabase
-      .from("clinical_notes")
-      .select("ai_summary")
-      .eq("patient_id", patient_id)
-      .not("ai_summary", "is", null)
-      .order("created_at", { ascending: false })
-      .limit(3),
-  ]);
-
-  const scanScore: number = latestScanResult.data?.ai_analysis?.severity_score ?? 0;
-  const surveyScore: number = latestSurveyResult.data?.ai_analysis?.severity_score ?? 0;
-
-  const notesScores: number[] =
-    latestNotesResult.data?.map((n: { ai_summary: { severity_score?: number } | null }) => n.ai_summary?.severity_score ?? 0) ?? [];
-  const avgNotesScore =
-    notesScores.length > 0
-      ? notesScores.reduce((a, b) => a + b, 0) / notesScores.length
-      : 0;
-
-  const aggregatedScore = Math.round(
-    scanScore * WEIGHTS.scan +
-    surveyScore * WEIGHTS.survey +
-    avgNotesScore * WEIGHTS.notes,
-  );
+  const latestNoteScoreMap =
+    trigger_type === "note" ? await loadLatestNoteScoreMap([patient_id]) : new Map<string, number>();
+  const aggregatedScore =
+    trigger_type === "note"
+      ? latestNoteScoreMap.get(patient_id) ?? new_component_score
+      : Math.max(new_component_score, Math.round((patient.risk_score ?? 0) * 0.85));
 
   const newTier = scoreToTier(aggregatedScore);
   const suggestedAction = tierToAction(newTier);
@@ -127,8 +81,5 @@ export async function triggerTriageEvaluation(
   const event = eventResult.data;
   if (!event) return;
 
-  // Create appointment suggestion for high/critical patients
-  if (newTier === "high" || newTier === "critical") {
-    await createAppointmentSuggestion(patient_id, newTier, event.id);
-  }
+  await createAppointmentSuggestion(patient_id, newTier, event.id);
 }

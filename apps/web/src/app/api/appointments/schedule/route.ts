@@ -1,6 +1,8 @@
 import { requireBusinessContext } from "@/lib/server/businessAuth";
 import { jsonErrorResponse } from "@/lib/server/http";
+import { loadLatestNoteScoreMap, scoreToTier } from "@/lib/noteSeverity";
 import { createSupabaseServerClient } from "@/lib/server/supabase";
+import { ACTIVE_APPOINTMENT_STATUSES } from "@/lib/scheduling";
 import type { WeeklyScheduleItem, Department } from "@triageai/shared";
 
 function getRelatedPatient(
@@ -67,12 +69,16 @@ export async function GET(req: Request) {
         )
       `)
       .eq("department", department)
-      .eq("status", "scheduled")
+      .in("status", [...ACTIVE_APPOINTMENT_STATUSES])
       .order("scheduled_at", { ascending: true });
 
     if (error) {
       return Response.json({ error: error.message }, { status: 500 });
     }
+
+    const noteScoreMap = await loadLatestNoteScoreMap(
+      (appointments ?? []).map((appointment) => appointment.patient_id as string),
+    );
 
     const startMs = start.getTime();
     const endMs = end.getTime();
@@ -97,14 +103,18 @@ export async function GET(req: Request) {
       })
       .map((appointment) => {
         const patient = getRelatedPatient(appointment.patients as unknown as Parameters<typeof getRelatedPatient>[0]);
+        const noteScore =
+          noteScoreMap.get(appointment.patient_id as string) ?? patient?.risk_score ?? 0;
 
         return {
           appointment_id: appointment.id,
           patient_id: appointment.patient_id,
           patient_name: patient?.full_name ?? "Unknown",
           department: appointment.department as Department,
-          risk_score: patient?.risk_score ?? 0,
-          risk_tier: patient?.risk_tier ?? "low",
+          risk_score: noteScore,
+          risk_tier: noteScoreMap.has(appointment.patient_id as string)
+            ? scoreToTier(noteScore)
+            : patient?.risk_tier ?? scoreToTier(noteScore),
           scheduled_at: appointment.scheduled_at,
           original_scheduled_at: appointment.original_scheduled_at,
           status: appointment.status as WeeklyScheduleItem["status"],

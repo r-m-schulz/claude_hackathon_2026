@@ -1,4 +1,5 @@
 import { createSupabaseServerClient } from "@/lib/server/supabase";
+import { isActiveAppointmentStatus } from "@/lib/scheduling";
 import type { TriageListItem, Department } from "@triageai/shared";
 
 export async function GET(req: Request) {
@@ -62,7 +63,7 @@ export async function GET(req: Request) {
       suggestion_status: string | null;
       status: string;
     }[])
-      ?.filter((a) => a.status === "scheduled")
+      ?.filter((a) => isActiveAppointmentStatus(a.status))
       ?.sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime())
       ?.[0];
 

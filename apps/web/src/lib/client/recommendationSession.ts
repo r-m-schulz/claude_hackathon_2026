@@ -26,3 +26,11 @@ export function loadLatestCriticalRecommendation(): CriticalScheduleRecommendati
     return null;
   }
 }
+
+export function clearLatestCriticalRecommendation() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.sessionStorage.removeItem(STORAGE_KEY);
+}

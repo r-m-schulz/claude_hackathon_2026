@@ -49,11 +49,22 @@ function buildScheduleHref(response: SavePatientNoteResponse) {
     department: response.recommendation.department,
     week_start: response.recommendation.week_start,
     focus_patient_id: response.recommendation.patient_id,
+    focus_patient_name: response.recommendation.patient_name,
   });
 
   if (response.recommendation.focused_appointment_id) {
     search.set("focus_appointment_id", response.recommendation.focused_appointment_id);
   }
+
+  return `/schedule?${search.toString()}`;
+}
+
+function buildManualScheduleHref(patient: BusinessPatientDetail) {
+  const search = new URLSearchParams({
+    department: patient.department,
+    focus_patient_id: patient.id,
+    focus_patient_name: patient.full_name,
+  });
 
   return `/schedule?${search.toString()}`;
 }
@@ -251,6 +262,12 @@ export default function PatientProfilePage({ patientId }: PatientProfilePageProp
                 : "Create the patient login from this page when you are ready."}
             </div>
           </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <Button asChild>
+            <Link href={buildManualScheduleHref(patient)}>Book on Calendar</Link>
+          </Button>
         </div>
 
         <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>

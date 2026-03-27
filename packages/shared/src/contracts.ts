@@ -201,6 +201,22 @@ export type WeeklyScheduleItem = {
   is_on_the_day: boolean;
 };
 
+export type ConfirmAppointmentInput = {
+  patient_id: string;
+  scheduled_at: string;
+  appointment_id?: string | null;
+  justification?: string | null;
+};
+
+export type ConfirmAppointmentResponse = {
+  success: boolean;
+  action: "created" | "updated";
+  appointment_id: string;
+  patient_id: string;
+  department: Department;
+  scheduled_at: string;
+};
+
 export type ScheduleRecommendationDirection = "earlier" | "later" | "unchanged";
 
 export type CriticalScheduleChange = {

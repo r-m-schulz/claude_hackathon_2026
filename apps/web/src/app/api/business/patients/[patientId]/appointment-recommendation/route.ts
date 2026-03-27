@@ -14,16 +14,24 @@ type RouteContext = {
   }>;
 };
 
-type RecommendationStatus = "recommended" | "already_scheduled_soon" | "no_existing_appointment";
+type RecommendationStatus =
+  | "recommended"
+  | "already_scheduled_soon"
+  | "already_best_slot"
+  | "no_existing_appointment";
 
-function recommendationCopy(status: RecommendationStatus) {
+function recommendationCopy(status: RecommendationStatus, hasExistingAppointment: boolean) {
   switch (status) {
     case "recommended":
       return {
         suggested_action: "bring_forward" as SuggestedAction,
         reasoning:
-          "Clinician requested an appointment recommendation after reviewing the uploaded note. The next scheduled appointment has been marked for earlier review.",
-        message: "Appointment recommendation created. The patient is now marked for scheduling review.",
+          hasExistingAppointment
+            ? "Clinician requested an appointment recommendation after reviewing the uploaded note. The existing appointment has been marked for an earlier clinically justified review slot."
+            : "Clinician requested an appointment recommendation after reviewing the uploaded note. No appointment existed, so the engine selected the best available follow-up slot for confirmation.",
+        message: hasExistingAppointment
+          ? "Appointment recommendation created. The patient is now marked for scheduling review."
+          : "Recommended follow-up slot created. Open the calendar to confirm the new appointment.",
       };
     case "already_scheduled_soon":
       return {
@@ -32,12 +40,19 @@ function recommendationCopy(status: RecommendationStatus) {
           "Clinician requested an appointment recommendation after reviewing the uploaded note. The patient already has a scheduled appointment inside the 7-day lock, so no earlier AI date was suggested.",
         message: "The patient already has an appointment soon, so no earlier recommendation was added.",
       };
+    case "already_best_slot":
+      return {
+        suggested_action: "routine" as SuggestedAction,
+        reasoning:
+          "Clinician requested an appointment recommendation after reviewing the uploaded note. The patient already holds the best available future slot once the calendar is ranked by severity score.",
+        message: "No new recommendation was added because the patient already has the best available slot for their current severity score.",
+      };
     case "no_existing_appointment":
       return {
         suggested_action: "routine" as SuggestedAction,
         reasoning:
-          "Clinician requested an appointment recommendation after reviewing the uploaded note. No scheduled appointment exists yet, so scheduling staff should book the next available slot manually.",
-        message: "Recommendation logged. This patient does not have an existing appointment yet, so scheduling staff should book the next available slot.",
+          "Clinician requested an appointment recommendation after reviewing the uploaded note, but no safe return slot could be found in the current calendar horizon.",
+        message: "No return slot could be recommended automatically. Please book the patient manually from the calendar.",
       };
   }
 }
@@ -65,7 +80,7 @@ export async function POST(req: Request, { params }: RouteContext) {
     }
 
     const recommendation = await createManualAppointmentRecommendation(patientId);
-    const copy = recommendationCopy(recommendation.status);
+    const copy = recommendationCopy(recommendation.status, Boolean(recommendation.appointment_id));
 
     const { data: triageEvent, error: triageEventError } = await supabase
       .from("triage_events")
