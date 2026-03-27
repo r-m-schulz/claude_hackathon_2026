@@ -197,6 +197,17 @@ function getTargetLeadDays(score: number, riskTier: RiskTier) {
   return 21;
 }
 
+function getPreferredStartAt(targetLeadDays: number) {
+  const preferredStart = addDays(new Date(), targetLeadDays);
+  preferredStart.setHours(SLOT_START_HOUR, 0, 0, 0);
+
+  while (!isBusinessDay(preferredStart)) {
+    preferredStart.setDate(preferredStart.getDate() + 1);
+  }
+
+  return preferredStart;
+}
+
 function buildLockedConstraints(
   lockedAppointments: QueueAppointment[],
   patient: SchedulingPatientRow,
@@ -434,12 +445,7 @@ export async function getSeverityDrivenScheduleResult(
   } as const;
 
   if (!currentAppointment) {
-    const preferredStart = addDays(new Date(), targetLeadDays);
-    preferredStart.setHours(SLOT_START_HOUR, 0, 0, 0);
-
-    while (!isBusinessDay(preferredStart)) {
-      preferredStart.setDate(preferredStart.getDate() + 1);
-    }
+    const preferredStart = getPreferredStartAt(targetLeadDays);
 
     const suggestedSlot = findNextAvailableSlot(queue, preferredStart);
 
@@ -568,6 +574,47 @@ export async function getSeverityDrivenScheduleResult(
       });
     }
 
+    if (patient.risk_tier === "low" || patient.risk_tier === "medium") {
+      const preferredStart = getPreferredStartAt(targetLeadDays);
+      const suggestedLaterSlot = findNextAvailableSlot(queue, preferredStart);
+
+      if (
+        suggestedLaterSlot &&
+        new Date(suggestedLaterSlot).getTime() > currentAppointmentTime
+      ) {
+        await applySchedulingUpdate(currentAppointment, {
+          ai_suggested_date: suggestedLaterSlot,
+          suggestion_status: "pending",
+          is_on_the_day: false,
+        });
+
+        return {
+          ...baseResult,
+          status: "recommended",
+          appointment_id: currentAppointment.appointmentId,
+          scheduled_at: currentAppointment.scheduledAt,
+          suggested_at: suggestedLaterSlot,
+          week_start: getWeekStart(suggestedLaterSlot).toISOString(),
+          queue_rank: 1,
+          has_existing_appointment: true,
+          is_on_the_day: false,
+          justification: buildJustification({
+            patient,
+            queueRank: 1,
+            appointmentCount: queue.length,
+            currentAppointment,
+            suggestedSlot: suggestedLaterSlot,
+            targetLeadDays,
+            lockedConstraints,
+            displacedCount: 0,
+            status: "recommended",
+          }),
+          locked_constraints: lockedConstraints,
+          changes: [],
+        };
+      }
+    }
+
     return {
       ...baseResult,
       status: "already_scheduled_soon",
@@ -670,18 +717,43 @@ export async function getSeverityDrivenScheduleResult(
     focusedChange && focusedChange.direction !== "unchanged"
       ? focusedChange.to
       : null;
+  let adjustedRecommendedSlot = recommendedSlot;
+
+  if (!adjustedRecommendedSlot && (patient.risk_tier === "low" || patient.risk_tier === "medium")) {
+    const preferredStart = getPreferredStartAt(targetLeadDays);
+    const shouldPushLater = currentAppointmentTime < preferredStart.getTime();
+
+    if (shouldPushLater) {
+      const suggestedLaterSlot = findNextAvailableSlot(queue, preferredStart);
+
+      if (
+        suggestedLaterSlot &&
+        new Date(suggestedLaterSlot).getTime() > currentAppointmentTime
+      ) {
+        adjustedRecommendedSlot = suggestedLaterSlot;
+      }
+    }
+  }
   const displacedCount = changes.filter(
     (change) => change.direction === "later" && change.patient_id !== patient.id,
   ).length;
-  const status = recommendedSlot ? "recommended" : "already_best_slot";
+  const status = adjustedRecommendedSlot ? "recommended" : "already_best_slot";
+
+  if (adjustedRecommendedSlot && adjustedRecommendedSlot !== recommendedSlot) {
+    await applySchedulingUpdate(currentAppointment, {
+      ai_suggested_date: adjustedRecommendedSlot,
+      suggestion_status: "pending",
+      is_on_the_day: false,
+    });
+  }
 
   return {
     ...baseResult,
     status,
     appointment_id: currentAppointment.appointmentId,
     scheduled_at: currentAppointment.scheduledAt,
-    suggested_at: recommendedSlot,
-    week_start: getWeekStart(recommendedSlot ?? currentAppointment.scheduledAt).toISOString(),
+    suggested_at: adjustedRecommendedSlot,
+    week_start: getWeekStart(adjustedRecommendedSlot ?? currentAppointment.scheduledAt).toISOString(),
     queue_rank: queueRank,
     has_existing_appointment: true,
     is_on_the_day: false,
@@ -690,7 +762,7 @@ export async function getSeverityDrivenScheduleResult(
       queueRank,
       appointmentCount: queue.length,
       currentAppointment,
-      suggestedSlot: recommendedSlot,
+      suggestedSlot: adjustedRecommendedSlot,
       targetLeadDays,
       lockedConstraints,
       displacedCount,

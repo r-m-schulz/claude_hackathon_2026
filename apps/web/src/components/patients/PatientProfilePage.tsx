@@ -69,6 +69,21 @@ function buildManualScheduleHref(patient: BusinessPatientDetail) {
   return `/schedule?${search.toString()}`;
 }
 
+function getRiskBadgeStyle(riskTier: string | null | undefined) {
+  switch (riskTier) {
+    case "critical":
+      return { background: "#fee2e2", color: "#991b1b", label: "Critical" };
+    case "high":
+      return { background: "#ffedd5", color: "#c2410c", label: "High" };
+    case "medium":
+      return { background: "#fef3c7", color: "#92400e", label: "Medium" };
+    case "low":
+      return { background: "#dcfce7", color: "#166534", label: "Low" };
+    default:
+      return { background: "#e2e8f0", color: "#334155", label: "Unknown" };
+  }
+}
+
 export default function PatientProfilePage({ patientId }: PatientProfilePageProps) {
   const router = useRouter();
   const [patient, setPatient] = useState<BusinessPatientDetail | null>(null);
@@ -222,6 +237,8 @@ export default function PatientProfilePage({ patientId }: PatientProfilePageProp
     );
   }
 
+  const riskBadge = getRiskBadgeStyle(patient.risk_tier);
+
   return (
     <section style={{ display: "grid", gap: 20 }}>
       <header
@@ -255,11 +272,11 @@ export default function PatientProfilePage({ patientId }: PatientProfilePageProp
               minWidth: 220,
             }}
           >
-            <div style={{ fontWeight: 700 }}>{patient.is_paired ? "Patient account paired" : "Portal account pending"}</div>
+            <div style={{ fontWeight: 700 }}>{patient.is_paired ? "Patient account paired" : "Patient account not paired"}</div>
             <div style={{ marginTop: 8, fontSize: 14, lineHeight: 1.6 }}>
               {patient.is_paired
                 ? `Paired on ${patient.paired_at ? formatDate(patient.paired_at) : "recently"}`
-                : "Create the patient login from this page when you are ready."}
+                : "Pair from the profile tools below when needed."}
             </div>
           </div>
         </div>
@@ -298,6 +315,22 @@ export default function PatientProfilePage({ patientId }: PatientProfilePageProp
               Patient status
             </div>
             <div style={{ marginTop: 10, fontWeight: 700 }}>{patient.is_paired ? "Portal ready" : "Business-side only"}</div>
+            <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <span
+                style={{
+                  borderRadius: 999,
+                  padding: "4px 8px",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  textTransform: "uppercase",
+                  background: riskBadge.background,
+                  color: riskBadge.color,
+                }}
+              >
+                {riskBadge.label}
+              </span>
+              <span style={{ fontSize: 13, color: "#334155", fontWeight: 600 }}>Score {patient.risk_score ?? 0}</span>
+            </div>
           </div>
           <div
             style={{

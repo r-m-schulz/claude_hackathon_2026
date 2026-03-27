@@ -20,6 +20,21 @@ const selectStyle: CSSProperties = {
   background: "#ffffff",
 };
 
+function getRiskBadgeStyle(riskTier: string | null | undefined) {
+  switch (riskTier) {
+    case "critical":
+      return { background: "#fee2e2", color: "#991b1b", label: "Critical" };
+    case "high":
+      return { background: "#ffedd5", color: "#c2410c", label: "High" };
+    case "medium":
+      return { background: "#fef3c7", color: "#92400e", label: "Medium" };
+    case "low":
+      return { background: "#dcfce7", color: "#166534", label: "Low" };
+    default:
+      return { background: "#e2e8f0", color: "#334155", label: "Unknown" };
+  }
+}
+
 export default function PatientsPage() {
   const [patients, setPatients] = useState<BusinessPatientSummary[]>([]);
   const [workspace, setWorkspace] = useState<BusinessWorkspaceSummary | null>(null);
@@ -41,6 +56,11 @@ export default function PatientsPage() {
   const practitioners = useMemo(
     () => workspace?.employees.filter((employee) => employee.role === "practitioner") ?? [],
     [workspace],
+  );
+
+  const sortedPatients = useMemo(
+    () => [...patients].sort((a, b) => (b.risk_score ?? 0) - (a.risk_score ?? 0)),
+    [patients],
   );
 
   async function loadData() {
@@ -204,7 +224,7 @@ export default function PatientsPage() {
           </div>
 
           <div style={{ display: "grid", gap: 12, flex: 1, alignContent: "start" }}>
-            {patients.length === 0 ? (
+            {sortedPatients.length === 0 ? (
               <div
                 style={{
                   borderRadius: 18,
@@ -217,54 +237,58 @@ export default function PatientsPage() {
                 No patients yet. Use the form to add the first patient.
               </div>
             ) : (
-              patients.map((patient) => (
-                <div
-                  key={patient.id}
-                  style={{
-                    borderRadius: 18,
-                    border: "1px solid #e2e8f0",
-                    padding: 18,
-                    display: "grid",
-                    gap: 12,
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-                    <div>
-                      <strong>{patient.full_name}</strong>
-                      <div style={{ marginTop: 6, fontSize: 14, color: "#475569", lineHeight: 1.6 }}>
-                        {patient.department.replaceAll("_", " ")} | {patient.primary_practitioner_name ?? "Unassigned"}
+              sortedPatients.map((patient) => {
+                const riskBadge = getRiskBadgeStyle(patient.risk_tier);
+
+                return (
+                  <div
+                    key={patient.id}
+                    style={{
+                      borderRadius: 18,
+                      border: "1px solid #e2e8f0",
+                      padding: 18,
+                      display: "grid",
+                      gap: 12,
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+                      <div>
+                        <strong>{patient.full_name}</strong>
+                        <div style={{ marginTop: 6, fontSize: 14, color: "#475569", lineHeight: 1.6 }}>
+                          {patient.department.replaceAll("_", " ")} | {patient.primary_practitioner_name ?? "Unassigned"}
+                        </div>
+                      </div>
+                      <div
+                        style={{
+                          alignSelf: "start",
+                          borderRadius: 999,
+                          padding: "6px 10px",
+                          fontSize: 12,
+                          fontWeight: 700,
+                          textTransform: "uppercase",
+                          background: riskBadge.background,
+                          color: riskBadge.color,
+                        }}
+                      >
+                        {riskBadge.label} {patient.risk_score ?? 0}
                       </div>
                     </div>
-                    <div
-                      style={{
-                        borderRadius: 999,
-                        padding: "6px 10px",
-                        fontSize: 12,
-                        fontWeight: 700,
-                        textTransform: "uppercase",
-                        background: patient.is_paired ? "#dcfce7" : "#fef3c7",
-                        color: patient.is_paired ? "#166534" : "#92400e",
-                        alignSelf: "start",
-                      }}
-                    >
-                      {patient.is_paired ? "Paired" : "Unpaired"}
+
+                    <div style={{ fontSize: 14, color: "#475569", lineHeight: 1.6 }}>
+                      {patient.email ?? "No email"} | {patient.phone ?? "No phone"} | DOB {patient.dob}
+                    </div>
+
+                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                      <Button asChild>
+                        <Link href={`/patients/${patient.id}`}>Open profile</Link>
+                      </Button>
+                      <Button type="button" variant="outline" onClick={() => onDeletePatient(patient.id)}>
+                        Remove patient
+                      </Button>
                     </div>
                   </div>
-
-                  <div style={{ fontSize: 14, color: "#475569", lineHeight: 1.6 }}>
-                    {patient.email ?? "No email"} | {patient.phone ?? "No phone"} | DOB {patient.dob}
-                  </div>
-
-                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                    <Button asChild>
-                      <Link href={`/patients/${patient.id}`}>Open profile</Link>
-                    </Button>
-                    <Button type="button" variant="outline" onClick={() => onDeletePatient(patient.id)}>
-                      Remove patient
-                    </Button>
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </article>
