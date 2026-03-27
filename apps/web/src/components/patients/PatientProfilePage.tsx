@@ -345,6 +345,37 @@ export default function PatientProfilePage({ patientId }: PatientProfilePageProp
             </div>
             <div style={{ marginTop: 10, fontWeight: 700 }}>{patient.context_entries.length}</div>
           </div>
+          <div
+            style={{
+              borderRadius: 18,
+              border: "1px solid",
+              borderColor:
+                patient.risk_tier === "critical" ? "#fecaca" :
+                patient.risk_tier === "high" ? "#fed7aa" :
+                patient.risk_tier === "medium" ? "#fef08a" : "#bbf7d0",
+              padding: 16,
+              background:
+                patient.risk_tier === "critical" ? "#fef2f2" :
+                patient.risk_tier === "high" ? "#fff7ed" :
+                patient.risk_tier === "medium" ? "#fefce8" : "#f0fdf4",
+            }}
+          >
+            <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.08em", color: "#64748b" }}>
+              Risk score
+            </div>
+            <div
+              style={{
+                marginTop: 10,
+                fontWeight: 700,
+                color:
+                  patient.risk_tier === "critical" ? "#991b1b" :
+                  patient.risk_tier === "high" ? "#c2410c" :
+                  patient.risk_tier === "medium" ? "#854d0e" : "#166534",
+              }}
+            >
+              {patient.risk_score} · {patient.risk_tier}
+            </div>
+          </div>
         </div>
       </header>
 

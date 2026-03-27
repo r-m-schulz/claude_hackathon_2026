@@ -449,10 +449,8 @@ export default function WeeklySchedule({
           flex: 1,
           border: "1px solid #e2e8f0",
           borderRadius: 14,
-          overflow: "hidden",
+          overflow: "auto",
           background: "#ffffff",
-          display: "flex",
-          flexDirection: "column",
           minHeight: 0,
         }}
       >
@@ -468,45 +466,46 @@ export default function WeeklySchedule({
         >
           <div style={{ width: TIME_W, flexShrink: 0, borderRight: "1px solid #e2e8f0" }} />
 
-          {days.map((day) => {
-            const isToday = isSameDay(day, today);
-            return (
-              <div
-                key={day.toISOString()}
-                style={{
-                  flex: 1,
-                  textAlign: "center",
-                  padding: "10px 4px 8px",
-                  background: isToday ? "#0f172a" : "transparent",
-                  borderRight: "1px solid #e2e8f0",
-                }}
-              >
+            {days.map((day) => {
+              const isToday = isSameDay(day, today);
+              return (
                 <div
+                  key={day.toISOString()}
                   style={{
-                    fontSize: 10,
-                    fontWeight: 600,
-                    letterSpacing: "0.07em",
-                    textTransform: "uppercase",
-                    color: isToday ? "#94a3b8" : "#64748b",
+                    flex: 1,
+                    minWidth: 120,
+                    textAlign: "center",
+                    padding: "10px 4px 8px",
+                    background: isToday ? "#0f172a" : "transparent",
+                    borderRight: "1px solid #e2e8f0",
                   }}
                 >
-                  {day.toLocaleDateString("en-US", { weekday: "short" })}
+                  <div
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 600,
+                      letterSpacing: "0.07em",
+                      textTransform: "uppercase",
+                      color: isToday ? "#94a3b8" : "#64748b",
+                    }}
+                  >
+                    {day.toLocaleDateString("en-US", { weekday: "short" })}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 20,
+                      fontWeight: 700,
+                      color: isToday ? "#ffffff" : "#0f172a",
+                      lineHeight: 1.2,
+                      marginTop: 2,
+                    }}
+                  >
+                    {day.getDate()}
+                  </div>
                 </div>
-                <div
-                  style={{
-                    fontSize: 20,
-                    fontWeight: 700,
-                    color: isToday ? "#ffffff" : "#0f172a",
-                    lineHeight: 1.2,
-                    marginTop: 2,
-                  }}
-                >
-                  {day.getDate()}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
 
         <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
           <div style={{ display: "flex", position: "relative", height: TOTAL_H }}>
@@ -555,6 +554,7 @@ export default function WeeklySchedule({
                   }
                   style={{
                     flex: 1,
+                    minWidth: 120,
                     position: "relative",
                     borderRight: "1px solid #e2e8f0",
                     background: isToday ? "#f8fafc" : "transparent",
