@@ -1,0 +1,41 @@
+<svg width="960" height="560" viewBox="0 0 960 560" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M0 0L10 5L0 10V0Z" fill="#5B6B7A"/>
+    </marker>
+    <style>
+      .title { font: 700 28px Arial, sans-serif; fill: #122033; }
+      .label { font: 700 18px Arial, sans-serif; fill: #122033; }
+      .sub { font: 400 14px Arial, sans-serif; fill: #5B6B7A; }
+      .line { stroke: #5B6B7A; stroke-width: 3; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <rect width="960" height="560" rx="28" fill="#F4F7FB"/>
+  <text x="48" y="56" class="title">TriageAI Tech Stack</text>
+
+  <rect x="90" y="100" width="300" height="90" rx="22" fill="#FFFFFF" stroke="#D7E1EA" stroke-width="2"/>
+  <text x="240" y="136" text-anchor="middle" class="label">Doctor / Staff Dashboard</text>
+  <text x="240" y="162" text-anchor="middle" class="sub">Next.js web app</text>
+
+  <rect x="570" y="100" width="300" height="90" rx="22" fill="#FFFFFF" stroke="#D7E1EA" stroke-width="2"/>
+  <text x="720" y="136" text-anchor="middle" class="label">Patient App</text>
+  <text x="720" y="162" text-anchor="middle" class="sub">Expo / React Native</text>
+
+  <rect x="290" y="248" width="380" height="96" rx="24" fill="#E8F5F3" stroke="#7CC7BA" stroke-width="2"/>
+  <text x="480" y="286" text-anchor="middle" class="label">Backend API</text>
+  <text x="480" y="312" text-anchor="middle" class="sub">Next.js API routes</text>
+
+  <rect x="110" y="414" width="300" height="92" rx="22" fill="#EEF5FF" stroke="#B7D3F2" stroke-width="2"/>
+  <text x="260" y="450" text-anchor="middle" class="label">Claude</text>
+  <text x="260" y="476" text-anchor="middle" class="sub">analysis and extraction</text>
+
+  <rect x="550" y="414" width="300" height="92" rx="22" fill="#F2F8F1" stroke="#BFD9B6" stroke-width="2"/>
+  <text x="700" y="450" text-anchor="middle" class="label">Supabase</text>
+  <text x="700" y="476" text-anchor="middle" class="sub">database, auth, storage</text>
+
+  <line x1="240" y1="190" x2="385" y2="248" class="line"/>
+  <line x1="720" y1="190" x2="575" y2="248" class="line"/>
+  <line x1="420" y1="344" x2="300" y2="414" class="line"/>
+  <line x1="540" y1="344" x2="660" y2="414" class="line"/>
+</svg>

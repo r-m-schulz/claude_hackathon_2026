@@ -1,6 +1,8 @@
 import { requireBusinessContext } from "@/lib/server/businessAuth";
 import { jsonErrorResponse, HttpError } from "@/lib/server/http";
 import { createSupabaseServerClient } from "@/lib/server/supabase";
+import { processClinicalNote } from "@/lib/noteAnalysis";
+import type { Department } from "@triageai/shared";
 
 type CreateNoteBody = {
   title?: string;
@@ -28,7 +30,7 @@ export async function POST(req: Request, { params }: RouteContext) {
     const supabase = createSupabaseServerClient();
     const { data: patient, error: patientError } = await supabase
       .from("patients")
-      .select("id")
+      .select("id, department")
       .eq("business_id", context.businessId)
       .eq("id", patientId)
       .maybeSingle();
@@ -41,21 +43,72 @@ export async function POST(req: Request, { params }: RouteContext) {
       throw new HttpError(404, "Patient not found.");
     }
 
-    const { error } = await supabase.from("patient_context_entries").insert({
-      business_id: context.businessId,
-      patient_id: patientId,
-      created_by_employee_id: context.employee.id,
-      entry_type: "note",
-      title,
-      body_text: noteText,
-      extracted_text: noteText,
-    });
+    const { data: contextEntry, error: contextEntryError } = await supabase
+      .from("patient_context_entries")
+      .insert({
+        business_id: context.businessId,
+        patient_id: patientId,
+        created_by_employee_id: context.employee.id,
+        entry_type: "note",
+        title,
+        body_text: noteText,
+        extracted_text: noteText,
+      })
+      .select("id")
+      .single();
 
-    if (error) {
-      throw new HttpError(400, error.message);
+    if (contextEntryError || !contextEntry) {
+      throw new HttpError(400, contextEntryError?.message ?? "Unable to save note.");
     }
 
-    return Response.json({ success: true });
+    const { data: clinicalNote, error: clinicalNoteError } = await supabase
+      .from("clinical_notes")
+      .insert({
+        patient_id: patientId,
+        clinician_id: context.employee.linked_clinician_id,
+        content: noteText,
+      })
+      .select("id")
+      .single();
+
+    if (clinicalNoteError || !clinicalNote) {
+      await supabase.from("patient_context_entries").delete().eq("id", contextEntry.id);
+      throw new HttpError(400, clinicalNoteError?.message ?? "Unable to create clinical note.");
+    }
+
+    let analysis = null;
+    let engineError: string | null = null;
+
+    try {
+      analysis = await processClinicalNote({
+        noteId: clinicalNote.id as string,
+        patientId,
+        department: patient.department as Department,
+        content: noteText,
+      });
+    } catch (error) {
+      engineError = error instanceof Error ? error.message : "Unknown note-analysis error.";
+    }
+
+    const metadata = {
+      clinical_note_id: clinicalNote.id,
+      triage_engine: {
+        status: analysis ? "processed" : "failed",
+        processed_at: new Date().toISOString(),
+        ai_summary: analysis,
+        error: engineError,
+      },
+    };
+
+    await supabase.from("patient_context_entries").update({ metadata }).eq("id", contextEntry.id);
+
+    return Response.json({
+      success: true,
+      clinical_note_id: clinicalNote.id,
+      analysis,
+      engine_processed: Boolean(analysis),
+      engine_error: engineError,
+    });
   } catch (error) {
     return jsonErrorResponse(error, "Unable to save note.");
   }

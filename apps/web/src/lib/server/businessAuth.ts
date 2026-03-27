@@ -25,6 +25,8 @@ type ManagedAuthUserInput = {
   metadata?: Record<string, unknown>;
 };
 
+const BUSINESS_MANAGED_PROFILE_SKIP_FLAG = "skip_profile_provisioning";
+
 function getBearerToken(req: Request) {
   const header = req.headers.get("authorization");
 
@@ -89,10 +91,13 @@ export async function requireBusinessContext(req: Request): Promise<Authenticate
 export async function createManagedAuthUser({ email, password, metadata }: ManagedAuthUserInput) {
   const supabase = createSupabaseServerClient();
   const { data, error } = await supabase.auth.admin.createUser({
-    email,
+    email: email.trim().toLowerCase(),
     password,
     email_confirm: true,
-    user_metadata: metadata,
+    user_metadata: {
+      ...metadata,
+      [BUSINESS_MANAGED_PROFILE_SKIP_FLAG]: true,
+    },
   });
 
   if (error || !data.user) {

@@ -2,6 +2,8 @@ import type { RiskTier } from "@triageai/shared";
 import { createSupabaseServerClient } from "@/lib/server/supabase";
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+const MANUAL_RECOMMENDATION_TARGET_DAYS = 14;
+const MANUAL_RECOMMENDATION_BUFFER_MS = 60 * 60 * 1000;
 
 // Days from now to suggest for each tier
 const DAYS_TO_ADVANCE: Record<string, number | null> = {
@@ -72,4 +74,66 @@ export async function createAppointmentSuggestion(
       is_on_the_day: false,
     })
     .eq("id", appointment.id);
+}
+
+export type ManualAppointmentRecommendationResult = {
+  status: "recommended" | "already_scheduled_soon" | "no_existing_appointment";
+  appointment_id: string | null;
+  suggested_date: string | null;
+};
+
+export async function createManualAppointmentRecommendation(
+  patient_id: string,
+): Promise<ManualAppointmentRecommendationResult> {
+  const supabase = createSupabaseServerClient();
+  const now = Date.now();
+  const earliestAllowedSuggestion = new Date(now + SEVEN_DAYS_MS + MANUAL_RECOMMENDATION_BUFFER_MS);
+
+  const { data: appointment } = await supabase
+    .from("appointments")
+    .select("id, scheduled_at")
+    .eq("patient_id", patient_id)
+    .eq("status", "scheduled")
+    .order("scheduled_at", { ascending: true })
+    .limit(1)
+    .single();
+
+  if (!appointment) {
+    return {
+      status: "no_existing_appointment",
+      appointment_id: null,
+      suggested_date: null,
+    };
+  }
+
+  const scheduledDate = new Date(appointment.scheduled_at);
+
+  if (scheduledDate <= earliestAllowedSuggestion) {
+    return {
+      status: "already_scheduled_soon",
+      appointment_id: appointment.id,
+      suggested_date: null,
+    };
+  }
+
+  const defaultSuggestedDate = new Date(
+    now + MANUAL_RECOMMENDATION_TARGET_DAYS * 24 * 60 * 60 * 1000,
+  );
+  const suggestedDate =
+    defaultSuggestedDate < scheduledDate ? defaultSuggestedDate : earliestAllowedSuggestion;
+
+  await supabase
+    .from("appointments")
+    .update({
+      ai_suggested_date: suggestedDate.toISOString(),
+      suggestion_status: "pending",
+      is_on_the_day: false,
+    })
+    .eq("id", appointment.id);
+
+  return {
+    status: "recommended",
+    appointment_id: appointment.id,
+    suggested_date: suggestedDate.toISOString(),
+  };
 }
