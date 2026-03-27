@@ -57,7 +57,7 @@ export default function SchedulePage() {
         display: "grid",
         gap: 20,
         gridTemplateRows: "auto 1fr",
-        height: "calc(100vh - 32px)",
+        height: "calc(100vh - 144px)",
         minHeight: 0,
         overflow: "hidden",
       }}
@@ -87,7 +87,7 @@ export default function SchedulePage() {
           display: "grid",
           gap: 20,
           gridTemplateColumns: "minmax(0, 1.3fr) minmax(320px, 0.7fr)",
-          alignItems: "start",
+          alignItems: "stretch",
           minHeight: 0,
         }}
       >
