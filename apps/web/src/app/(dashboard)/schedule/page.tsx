@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { Suspense, useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type {
@@ -13,8 +14,6 @@ import type {
 } from "@triageai/shared";
 
 import WeeklySchedule from "@/components/calendar/WeeklySchedule";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { apiFetch } from "@/lib/client/api";
 import {
   clearLatestCriticalRecommendation,
@@ -43,10 +42,7 @@ function formatDateTime(value: string) {
 }
 
 function parseInitialWeekStart(value: string | null) {
-  if (value) {
-    return new Date(value);
-  }
-
+  if (value) return new Date(value);
   const date = new Date();
   const day = date.getDay();
   date.setDate(date.getDate() - day + (day === 0 ? -6 : 1));
@@ -62,10 +58,27 @@ function weekStartForValue(value: string) {
   return date;
 }
 
+function isSameInstant(a: string, b: string) {
+  return new Date(a).getTime() === new Date(b).getTime();
+}
+
+function SideSection({ title, label, children }: { title: string; label?: string; children: ReactNode }) {
+  return (
+    <div className="db-card" style={{ overflow: "hidden" }}>
+      <div className="db-card-header">
+        <span className="db-card-title">{title}</span>
+        {label && <span className="db-badge db-badge-blue">{label}</span>}
+      </div>
+      <div style={{ padding: 14 }}>{children}</div>
+    </div>
+  );
+}
+
 function SchedulePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const searchKey = searchParams.toString();
+
   const [workspace, setWorkspace] = useState<BusinessWorkspaceSummary | null>(null);
   const [patients, setPatients] = useState<BusinessPatientSummary[]>([]);
   const [schedule, setSchedule] = useState<WeeklyScheduleItem[]>([]);
@@ -97,10 +110,7 @@ function SchedulePageContent() {
     async function loadPage() {
       try {
         const nextWorkspace = await apiFetch<BusinessWorkspaceSummary>("/api/business/workspace");
-        if (!isMounted) {
-          return;
-        }
-
+        if (!isMounted) return;
         setWorkspace(nextWorkspace);
 
         const department =
@@ -110,33 +120,21 @@ function SchedulePageContent() {
           nextWorkspace.recent_patients[0]?.department ??
           null;
 
-        if (!department) {
-          throw new Error("No department is configured for this workspace schedule.");
-        }
+        if (!department) throw new Error("No department is configured for this workspace schedule.");
 
         const [scheduleResponse, patientsResponse] = await Promise.all([
-          apiFetch<ScheduleResponse>(
-            `/api/appointments/schedule?department=${encodeURIComponent(department)}&week_start=${encodeURIComponent(weekStart.toISOString())}`,
-          ),
+          apiFetch<ScheduleResponse>(`/api/appointments/schedule?department=${encodeURIComponent(department)}&week_start=${encodeURIComponent(weekStart.toISOString())}`),
           apiFetch<PatientsResponse>("/api/business/patients"),
         ]);
 
-        if (!isMounted) {
-          return;
-        }
+        if (!isMounted) return;
 
         setSchedule(scheduleResponse.schedule);
         setActiveDepartment(scheduleResponse.department);
-        setPatients(
-          [...patientsResponse.patients].sort((a, b) => a.full_name.localeCompare(b.full_name)),
-        );
+        setPatients([...patientsResponse.patients].sort((a, b) => a.full_name.localeCompare(b.full_name)));
 
         const latestRecommendation = loadLatestCriticalRecommendation();
-        if (
-          latestRecommendation &&
-          focusPatientId &&
-          latestRecommendation.patient_id === focusPatientId
-        ) {
+        if (latestRecommendation && focusPatientId && latestRecommendation.patient_id === focusPatientId) {
           setRecommendation(latestRecommendation);
           setSelectedSlot(latestRecommendation.suggested_at ?? null);
         } else {
@@ -146,81 +144,70 @@ function SchedulePageContent() {
         setError(null);
         setActionError(null);
       } catch (loadError) {
-        if (!isMounted) {
-          return;
-        }
-
+        if (!isMounted) return;
         setError(loadError instanceof Error ? loadError.message : "Unable to load workflow view.");
       } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
+        if (isMounted) setLoading(false);
       }
     }
 
     setLoading(true);
     void loadPage();
-
-    return () => {
-      isMounted = false;
-    };
+    return () => { isMounted = false; };
   }, [focusPatientId, searchKey, weekStart]);
 
-  const hrEmployees = useMemo(
-    () => workspace?.employees.filter((employee) => employee.role === "hr") ?? [],
-    [workspace],
-  );
-  const practitioners = useMemo(
-    () => workspace?.employees.filter((employee) => employee.role === "practitioner") ?? [],
-    [workspace],
-  );
-  const focusedPatient = useMemo(
-    () => patients.find((patient) => patient.id === focusPatientId) ?? null,
-    [focusPatientId, patients],
-  );
+  const hrEmployees = useMemo(() => workspace?.employees.filter((e) => e.role === "hr") ?? [], [workspace]);
+  const practitioners = useMemo(() => workspace?.employees.filter((e) => e.role === "practitioner") ?? [], [workspace]);
+  const focusedPatient = useMemo(() => patients.find((p) => p.id === focusPatientId) ?? null, [focusPatientId, patients]);
+
   const visiblePatients = useMemo(() => {
     const query = deferredPatientSearch.trim().toLowerCase();
-    const matches = patients.filter((patient) => {
-      if (!query) {
-        return true;
-      }
-
-      const haystack = [
-        patient.full_name,
-        patient.email ?? "",
-        patient.phone ?? "",
-        patient.department.replaceAll("_", " "),
-      ]
-        .join(" ")
-        .toLowerCase();
-
-      return haystack.includes(query);
+    const matches = patients.filter((p) => {
+      if (!query) return true;
+      return [p.full_name, p.email ?? "", p.phone ?? "", p.department.replaceAll("_", " ")].join(" ").toLowerCase().includes(query);
     });
-    const departmentMatches = activeDepartment
-      ? matches.filter((patient) => patient.department === activeDepartment)
-      : matches;
-
-    return (departmentMatches.length > 0 ? departmentMatches : matches).slice(0, 10);
+    const deptMatches = activeDepartment ? matches.filter((p) => p.department === activeDepartment) : matches;
+    return (deptMatches.length > 0 ? deptMatches : matches).slice(0, 10);
   }, [activeDepartment, deferredPatientSearch, patients]);
+
   const displacedPatients = useMemo(
-    () =>
-      recommendation?.changes.filter(
-        (change) => change.direction === "later" && change.patient_id !== recommendation.patient_id,
-      ) ?? [],
+    () => recommendation?.changes.filter((c) => c.direction === "later" && c.patient_id !== recommendation.patient_id) ?? [],
     [recommendation],
   );
-  const pendingSlot = selectedSlot ?? recommendation?.suggested_at ?? null;
+
+  const recommendedExistingAppointment = useMemo(
+    () => recommendation?.focused_appointment_id
+      ? schedule.find((item) => item.appointment_id === recommendation.focused_appointment_id) ?? null
+      : null,
+    [recommendation, schedule],
+  );
+
+  const focusedAppointment = useMemo(() => {
+    const appointmentId = recommendation?.focused_appointment_id ?? focusAppointmentId;
+    return appointmentId ? schedule.find((item) => item.appointment_id === appointmentId) ?? null : null;
+  }, [focusAppointmentId, recommendation, schedule]);
+
+  const recommendedBaseSlot = recommendation?.suggested_at ?? (recommendation?.focused_appointment_id ? recommendedExistingAppointment?.scheduled_at ?? null : null);
+  const pendingSlot = selectedSlot ?? recommendedBaseSlot ?? null;
   const pendingPatientName = recommendation?.patient_name ?? focusPatientName;
   const pendingDepartment = recommendation?.department ?? activeDepartment;
   const pendingRiskScore = recommendation?.critical_score ?? null;
   const pendingRiskTier = recommendation?.risk_tier ?? null;
   const canConfirmAppointment = Boolean(focusPatientId && pendingSlot && pendingPatientName && pendingDepartment);
+  const canCreateAdditionalAppointment = Boolean(focusPatientId && selectedSlot && pendingPatientName && pendingDepartment && selectedSlot !== focusedAppointment?.scheduled_at);
+  const occupiedSlotSelection = useMemo(
+    () =>
+      selectedSlot
+        ? schedule.find((item) => isSameInstant(item.scheduled_at, selectedSlot) && item.appointment_id !== focusedAppointment?.appointment_id) ?? null
+        : null,
+    [focusedAppointment?.appointment_id, schedule, selectedSlot],
+  );
   const pendingSlotLabel =
     recommendation?.suggested_at && pendingSlot === recommendation.suggested_at
-      ? recommendation.focused_appointment_id
-        ? "pending confirm"
-        : "recommended slot"
-      : "selected slot";
+      ? recommendation.focused_appointment_id ? "pending confirm" : "recommended slot"
+      : recommendation?.focused_appointment_id && !selectedSlot
+        ? "current flagged slot"
+        : "selected slot";
 
   function focusPatientForManualBooking(patient: BusinessPatientSummary) {
     setSelectedSlot(null);
@@ -234,7 +221,6 @@ function SchedulePageContent() {
     nextSearch.set("focus_patient_id", patient.id);
     nextSearch.set("focus_patient_name", patient.full_name);
     nextSearch.delete("focus_appointment_id");
-
     router.replace(`/schedule?${nextSearch.toString()}`);
   }
 
@@ -248,14 +234,12 @@ function SchedulePageContent() {
     nextSearch.delete("focus_patient_id");
     nextSearch.delete("focus_patient_name");
     nextSearch.delete("focus_appointment_id");
-
     router.replace(`/schedule?${nextSearch.toString()}`);
   }
 
-  async function onConfirmAppointment() {
-    if (!focusPatientId || !pendingSlot) {
-      return;
-    }
+  async function onConfirmAppointment(mode: "confirm" | "create" = "confirm") {
+    const slotToBook = mode === "create" ? selectedSlot : pendingSlot;
+    if (!focusPatientId || !slotToBook) return;
 
     setConfirmingAppointment(true);
     setConfirmationMessage(null);
@@ -264,17 +248,14 @@ function SchedulePageContent() {
     try {
       const body: ConfirmAppointmentInput = {
         patient_id: focusPatientId,
-        appointment_id: recommendation?.focused_appointment_id ?? focusAppointmentId ?? null,
-        scheduled_at: pendingSlot,
-        justification:
-          recommendation?.rationale ??
-          `Manual calendar booking created for ${pendingPatientName ?? "the focused patient"}.`,
+        appointment_id: mode === "create" ? null : recommendation?.focused_appointment_id ?? focusAppointmentId ?? null,
+        scheduled_at: slotToBook,
+        justification: mode === "create"
+          ? `Manual calendar booking created for ${pendingPatientName ?? "the focused patient"}.`
+          : recommendation?.rationale ?? `Manual calendar booking created for ${pendingPatientName ?? "the focused patient"}.`,
       };
 
-      const response = await apiFetch<ConfirmAppointmentResponse>("/api/appointments/confirm", {
-        method: "POST",
-        body: JSON.stringify(body),
-      });
+      const response = await apiFetch<ConfirmAppointmentResponse>("/api/appointments/confirm", { method: "POST", body: JSON.stringify(body) });
 
       clearLatestCriticalRecommendation();
       setRecommendation(null);
@@ -293,116 +274,70 @@ function SchedulePageContent() {
       nextSearch.set("week_start", nextWeekStart.toISOString());
       nextSearch.set("focus_patient_id", response.patient_id);
       nextSearch.set("focus_appointment_id", response.appointment_id);
-      if (pendingPatientName) {
-        nextSearch.set("focus_patient_name", pendingPatientName);
-      }
-
+      if (pendingPatientName) nextSearch.set("focus_patient_name", pendingPatientName);
       router.replace(`/schedule?${nextSearch.toString()}`);
     } catch (confirmError) {
-      setActionError(
-        confirmError instanceof Error
-          ? confirmError.message
-          : "Unable to confirm the appointment.",
-      );
+      setActionError(confirmError instanceof Error ? confirmError.message : "Unable to confirm the appointment.");
     } finally {
       setConfirmingAppointment(false);
     }
   }
 
-  if (loading) {
-    return <p style={{ margin: 0, color: "#64748b" }}>Loading workflow view...</p>;
-  }
-
-  if (error || !workspace) {
-    return (
-      <section
-        style={{
-          borderRadius: 18,
-          border: "1px solid #fecaca",
-          background: "#fef2f2",
-          padding: 18,
-          color: "#991b1b",
-        }}
-      >
-        {error ?? "Unable to load workflow view."}
-      </section>
-    );
-  }
+  if (loading) return <p style={{ margin: 0, color: "var(--ds-text-3)", fontSize: 13 }}>Loading workflow…</p>;
+  if (error || !workspace) return <div className="db-alert-error">{error ?? "Unable to load workflow view."}</div>;
 
   return (
-    <section
-      style={{
-        display: "grid",
-        gap: 20,
-        gridTemplateRows: "auto auto",
-        minHeight: "calc(100vh - 32px)",
-      }}
-    >
-      <header
-        style={{
-          borderRadius: 24,
-          border: "1px solid #dbe2ee",
-          background: "#ffffff",
-          padding: 24,
-          display: "grid",
-          gap: 12,
-        }}
-      >
-        <p style={{ margin: 0, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.12em", color: "#64748b" }}>
-          Workflow
-        </p>
-        <h1 style={{ margin: 0, fontSize: 34 }}>Critical scheduling workflow</h1>
-        <p style={{ margin: 0, color: "#475569", lineHeight: 1.6 }}>
-          The calendar now reflects live patient priority, suggested reslots, and the latest critical-engine
-          recommendation for this workspace.
-        </p>
-      </header>
+    <div className="db-page">
 
-      <section
-        style={{
-          display: "grid",
-          gap: 20,
-          gridTemplateColumns: "minmax(0, 1.3fr) minmax(320px, 0.7fr)",
-          alignItems: "start",
-          minHeight: 0,
-        }}
-      >
-        <article
-          style={{
-            borderRadius: 24,
-            border: "1px solid #dbe2ee",
-            background: "#ffffff",
-            padding: 24,
-            display: "flex",
-            flexDirection: "column",
-            gap: 16,
-            minHeight: 0,
-            overflow: "hidden",
-          }}
-        >
+      {/* ── Page header ── */}
+      <div className="db-page-header">
+        <div className="db-page-title-row">
           <div>
-            <h2 style={{ margin: 0, fontSize: 24 }}>Calendar</h2>
-            <p style={{ margin: "8px 0 0", color: "#475569", lineHeight: 1.6 }}>
-              Solid cards show current bookings. Dashed cards show the engine’s recommended slot for pending
-              reschedules.
-            </p>
+            <div className="db-label-section">Workflow</div>
+            <h1 className="db-page-title" style={{ marginTop: 4 }}>Critical Scheduling</h1>
+            <p className="db-page-desc">Live patient priority, reslot suggestions, and the latest AI triage recommendation.</p>
           </div>
+          {activeDepartment && (
+            <span className="db-badge db-badge-blue">{activeDepartment.replaceAll("_", " ")}</span>
+          )}
+        </div>
+      </div>
 
-          <div style={{ flex: 1, minHeight: 0 }}>
+      {/* ── Main grid ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 300px", gap: 16, alignItems: "start" }}>
+
+        {/* Calendar */}
+        <div className="db-card" style={{ overflow: "hidden" }}>
+          <div className="db-card-header">
+            <span className="db-card-title">Weekly Calendar</span>
+            <span style={{ fontSize: 12, color: "var(--ds-text-3)" }}>
+              Solid = booked · Dashed = recommended reslot
+            </span>
+          </div>
+          <div style={{ padding: "0 0 4px" }}>
             <WeeklySchedule
               items={schedule}
               weekStart={weekStart}
               onWeekChange={setWeekStart}
               highlightedAppointmentId={focusAppointmentId}
               highlightedPatientId={focusPatientId}
-              onSlotSelect={
-                focusPatientId
-                  ? (slotAt) => {
-                      setSelectedSlot(slotAt);
-                      setConfirmationMessage(null);
-                    }
-                  : undefined
-              }
+              onSlotSelect={focusPatientId ? (slotAt) => {
+                const conflictingAppointment = schedule.find(
+                  (item) => isSameInstant(item.scheduled_at, slotAt) && item.appointment_id !== focusedAppointment?.appointment_id,
+                );
+
+                if (conflictingAppointment) {
+                  setActionError(
+                    `${formatDateTime(slotAt)} is already booked for ${conflictingAppointment.patient_name}. Choose an empty slot to add a new appointment.`,
+                  );
+                  setConfirmationMessage(null);
+                  return;
+                }
+
+                setSelectedSlot(slotAt);
+                setConfirmationMessage(null);
+                setActionError(null);
+              } : undefined}
               proposedSlot={pendingSlot}
               proposedPatientId={focusPatientId}
               proposedPatientName={pendingPatientName}
@@ -412,503 +347,270 @@ function SchedulePageContent() {
               proposedLabel={pendingSlotLabel}
             />
           </div>
-        </article>
+        </div>
 
-        <div
-          style={{
-            display: "grid",
-            gap: 20,
-            alignContent: "start",
-          }}
-        >
-          <article
-            style={{
-              borderRadius: 24,
-              border: "1px solid #dbe2ee",
-              background: "#ffffff",
-              padding: 24,
-              display: "grid",
-              gap: 16,
-            }}
-          >
-            <div>
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: 12,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.12em",
-                  color: "#1d4ed8",
-                }}
-              >
-                Manual Scheduling
-              </p>
-              <h2 style={{ margin: "8px 0 0", fontSize: 24 }}>Choose a patient</h2>
-              <p style={{ margin: "10px 0 0", color: "#475569", lineHeight: 1.6 }}>
-                Pick a patient, then click a slot on the calendar to create the appointment manually.
-              </p>
-            </div>
+        {/* Right panel */}
+        <div style={{ display: "grid", gap: 14 }}>
 
+          {/* Patient selector */}
+          <SideSection title="Select Patient" label="Manual">
             <div style={{ display: "grid", gap: 10 }}>
-              <Input
+              <input
+                className="db-input"
                 value={patientSearch}
-                onChange={(event) => setPatientSearch(event.target.value)}
-                placeholder="Search patient name, email, phone, or department"
+                onChange={(e) => setPatientSearch(e.target.value)}
+                placeholder="Search name, email, dept…"
               />
-              {focusedPatient ? (
-                <div
-                  style={{
-                    borderRadius: 18,
-                    border: "1px solid #bfdbfe",
-                    background: "#eff6ff",
-                    padding: 16,
-                    display: "grid",
-                    gap: 10,
-                  }}
-                >
-                  <div>
-                    <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.08em", color: "#1d4ed8" }}>
-                      Selected patient
-                    </div>
-                    <div style={{ marginTop: 8, fontWeight: 700, color: "#0f172a" }}>{focusedPatient.full_name}</div>
-                    <div style={{ marginTop: 6, fontSize: 14, color: "#475569" }}>
-                      {focusedPatient.department.replaceAll("_", " ")} · {focusedPatient.risk_tier} {focusedPatient.risk_score}
-                    </div>
+
+              {focusedPatient && (
+                <div style={{
+                  padding: "10px 12px",
+                  background: "var(--ds-accent-bg)",
+                  border: "1px solid #BFDBFE",
+                  borderRadius: 6,
+                  display: "grid",
+                  gap: 8,
+                }}>
+                  <div className="db-label-section" style={{ color: "var(--ds-accent)" }}>Selected</div>
+                  <div style={{ fontWeight: 700, color: "var(--ds-text)" }}>{focusedPatient.full_name}</div>
+                  <div style={{ fontSize: 12, color: "var(--ds-text-2)" }}>
+                    {focusedPatient.department.replaceAll("_", " ")} · {focusedPatient.risk_tier} {focusedPatient.risk_score}
                   </div>
-                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                    <Button
-                      type="button"
-                      onClick={() => focusPatientForManualBooking(focusedPatient)}
-                    >
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button type="button" className="db-btn db-btn-primary" style={{ fontSize: 12, padding: "5px 10px" }}
+                      onClick={() => focusPatientForManualBooking(focusedPatient)}>
                       Use in Calendar
-                    </Button>
-                    <Button type="button" variant="outline" onClick={clearFocusedPatient}>
-                      Clear Selection
-                    </Button>
+                    </button>
+                    <button type="button" className="db-btn db-btn-secondary" style={{ fontSize: 12, padding: "5px 10px" }}
+                      onClick={clearFocusedPatient}>
+                      Clear
+                    </button>
                   </div>
                 </div>
-              ) : null}
+              )}
 
-              <div
-                style={{
-                  borderRadius: 18,
-                  border: "1px solid #e2e8f0",
-                  background: "#f8fafc",
-                  maxHeight: 300,
-                  overflowY: "auto",
-                }}
-              >
+              <div style={{ border: "1px solid var(--ds-border)", borderRadius: 6, overflow: "hidden", maxHeight: 280, overflowY: "auto" }}>
                 {visiblePatients.length === 0 ? (
-                  <div style={{ padding: 16, color: "#475569", lineHeight: 1.6 }}>
-                    No patients match this search.
-                  </div>
-                ) : (
-                  visiblePatients.map((patient) => {
-                    const isSelected = patient.id === focusPatientId;
-
-                    return (
-                      <button
-                        key={patient.id}
-                        type="button"
-                        onClick={() => focusPatientForManualBooking(patient)}
-                        style={{
-                          width: "100%",
-                          border: "none",
-                          borderBottom: "1px solid #e2e8f0",
-                          background: isSelected ? "#eff6ff" : "transparent",
-                          padding: 16,
-                          textAlign: "left",
-                          cursor: "pointer",
-                          display: "grid",
-                          gap: 6,
-                        }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                          <strong style={{ color: "#0f172a" }}>{patient.full_name}</strong>
-                          <span
-                            style={{
-                              fontSize: 11,
-                              fontWeight: 700,
-                              padding: "3px 8px",
-                              borderRadius: 999,
-                              background: isSelected ? "#dbeafe" : "#e2e8f0",
-                              color: isSelected ? "#1d4ed8" : "#475569",
-                            }}
-                          >
-                            {patient.risk_tier} {patient.risk_score}
-                          </span>
-                        </div>
-                        <div style={{ fontSize: 14, color: "#475569" }}>
-                          {patient.department.replaceAll("_", " ")}
-                        </div>
-                        <div style={{ fontSize: 13, color: "#64748b" }}>
-                          {patient.email ?? patient.phone ?? "No contact details"}
-                        </div>
-                      </button>
-                    );
-                  })
-                )}
+                  <div style={{ padding: 12, fontSize: 13, color: "var(--ds-text-3)" }}>No patients match.</div>
+                ) : visiblePatients.map((patient) => {
+                  const isSelected = patient.id === focusPatientId;
+                  return (
+                    <button
+                      key={patient.id}
+                      type="button"
+                      onClick={() => focusPatientForManualBooking(patient)}
+                      style={{
+                        width: "100%",
+                        border: "none",
+                        borderBottom: "1px solid #F1F5F9",
+                        background: isSelected ? "var(--ds-accent-bg)" : "white",
+                        padding: "9px 12px",
+                        textAlign: "left",
+                        cursor: "pointer",
+                        display: "grid",
+                        gap: 3,
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ds-text)" }}>{patient.full_name}</span>
+                        <span className={`db-badge ${isSelected ? "db-badge-blue" : "db-badge-gray"}`}>
+                          {patient.risk_tier} {patient.risk_score}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 11, color: "var(--ds-text-3)" }}>
+                        {patient.department.replaceAll("_", " ")} · {patient.email ?? patient.phone ?? "No contact"}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
-          </article>
+          </SideSection>
 
-          {confirmationMessage ? (
-            <article
-              style={{
-                borderRadius: 18,
-                border: "1px solid #bbf7d0",
-                background: "#f0fdf4",
-                padding: 18,
-                color: "#166534",
-                lineHeight: 1.7,
-              }}
-            >
-              {confirmationMessage}
-            </article>
-          ) : null}
+          {/* Alerts */}
+          {confirmationMessage && (
+            <div className="db-alert-success">{confirmationMessage}</div>
+          )}
+          {actionError && (
+            <div className="db-alert-error">{actionError}</div>
+          )}
 
-          {actionError ? (
-            <article
-              style={{
-                borderRadius: 18,
-                border: "1px solid #fecaca",
-                background: "#fef2f2",
-                padding: 18,
-                color: "#991b1b",
-                lineHeight: 1.7,
-              }}
-            >
-              {actionError}
-            </article>
-          ) : null}
+          {/* Recommendation panel */}
+          {recommendation && (
+            <SideSection title={recommendation.patient_name} label="AI Recommendation">
+              <div style={{ display: "grid", gap: 12 }}>
 
-          {recommendation ? (
-            <article
-              style={{
-                borderRadius: 24,
-                border: "1px solid #bfdbfe",
-                background: "linear-gradient(180deg, #eff6ff 0%, #ffffff 100%)",
-                padding: 24,
-                display: "grid",
-                gap: 14,
-              }}
-            >
-              <div>
-                <p
-                  style={{
-                    margin: 0,
-                    fontSize: 12,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.12em",
-                    color: "#1d4ed8",
-                  }}
-                >
-                  Latest Recommendation
-                </p>
-                <h2 style={{ margin: "8px 0 0", fontSize: 24 }}>{recommendation.patient_name}</h2>
-                <p style={{ margin: "10px 0 0", color: "#475569", lineHeight: 1.6 }}>
-                  Critical score <strong>{recommendation.critical_score}</strong> from note severity{" "}
-                  <strong>{recommendation.severity_score}</strong>. Risk tier:{" "}
-                  <strong>{recommendation.risk_tier}</strong>.
-                </p>
-              </div>
-
-              <div
-                style={{
-                  borderRadius: 18,
-                  border: "1px solid #dbeafe",
-                  background: "#ffffff",
-                  padding: 18,
-                  color: "#1e293b",
-                  lineHeight: 1.7,
-                }}
-              >
-                {recommendation.rationale}
-              </div>
-
-              {recommendation.suggested_at ? (
-                <div
-                  style={{
-                    borderRadius: 18,
-                    border: "1px solid #c7d2fe",
-                    background: "#f8faff",
-                    padding: 18,
-                  }}
-                >
-                  <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.08em", color: "#64748b" }}>
-                    Recommended Slot
-                  </div>
-                  <div style={{ marginTop: 8, fontSize: 20, fontWeight: 700, color: "#0f172a" }}>
-                    {formatDateTime(recommendation.suggested_at)}
-                  </div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <span className="db-badge db-badge-red">Score {recommendation.critical_score}</span>
+                  <span className="db-badge db-badge-amber">Severity {recommendation.severity_score}</span>
+                  <span className="db-badge db-badge-gray">{recommendation.risk_tier}</span>
                 </div>
-              ) : null}
 
-              {focusPatientId ? (
-                <div
-                  style={{
-                    borderRadius: 18,
-                    border: "1px solid #dbeafe",
-                    background: "#ffffff",
-                    padding: 18,
-                    display: "grid",
-                    gap: 12,
-                  }}
-                >
-                  <div>
-                    <div
-                      style={{
-                        fontSize: 12,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.08em",
-                        color: "#64748b",
-                      }}
-                    >
-                      Confirm Booking
+                <div style={{
+                  padding: "10px 12px",
+                  background: "#FAFCFF",
+                  border: "1px solid var(--ds-border)",
+                  borderRadius: 6,
+                  fontSize: 13,
+                  color: "var(--ds-text-2)",
+                  lineHeight: 1.6,
+                }}>
+                  {recommendation.rationale}
+                </div>
+
+                {recommendation.suggested_at && (
+                  <div style={{ padding: "10px 12px", background: "var(--ds-accent-bg)", border: "1px solid #BFDBFE", borderRadius: 6 }}>
+                    <div className="db-label-section" style={{ color: "var(--ds-accent)" }}>Recommended Slot</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: "var(--ds-text)", marginTop: 6, letterSpacing: "-0.01em" }}>
+                      {formatDateTime(recommendation.suggested_at)}
                     </div>
-                    <div style={{ marginTop: 8, color: "#334155", lineHeight: 1.6 }}>
+                  </div>
+                )}
+
+                {focusPatientId && (
+                  <div style={{ padding: "10px 12px", border: "1px solid var(--ds-border)", borderRadius: 6, display: "grid", gap: 10 }}>
+                    <div className="db-label-section">Confirm Booking</div>
+                    <div style={{ fontSize: 12, color: "var(--ds-text-2)", lineHeight: 1.5 }}>
                       {pendingSlot
-                        ? `Confirm ${formatDateTime(pendingSlot)} for ${pendingPatientName ?? recommendation.patient_name}, or click another slot in the calendar to override it.`
-                        : "Click any free slot on the calendar to create or confirm the appointment."}
+                        ? `${formatDateTime(pendingSlot)} for ${pendingPatientName ?? recommendation.patient_name}`
+                        : "Click a free slot on the calendar."}
+                    </div>
+                    {occupiedSlotSelection && (
+                      <div style={{ fontSize: 12, color: "#B45309", lineHeight: 1.5 }}>
+                        {formatDateTime(occupiedSlotSelection.scheduled_at)} is already booked for {occupiedSlotSelection.patient_name}.
+                      </div>
+                    )}
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      <button type="button" className="db-btn db-btn-primary" style={{ fontSize: 12, padding: "6px 12px" }}
+                        onClick={() => void onConfirmAppointment("confirm")}
+                        disabled={!canConfirmAppointment || confirmingAppointment}>
+                        {confirmingAppointment ? "Confirming…" : recommendation.focused_appointment_id ? "Confirm" : "Create"}
+                      </button>
+                      {focusedAppointment && (
+                        <button type="button" className="db-btn db-btn-secondary" style={{ fontSize: 12, padding: "6px 12px" }}
+                          onClick={() => void onConfirmAppointment("create")}
+                          disabled={!canCreateAdditionalAppointment || confirmingAppointment}>
+                          {confirmingAppointment ? "Saving…" : "Add New"}
+                        </button>
+                      )}
                     </div>
                   </div>
-                  <Button onClick={onConfirmAppointment} disabled={!canConfirmAppointment || confirmingAppointment}>
-                    {confirmingAppointment
-                      ? "Confirming..."
-                      : recommendation.focused_appointment_id
-                        ? "Confirm Appointment"
-                        : "Create Appointment"}
-                  </Button>
-                </div>
-              ) : null}
+                )}
 
-              {recommendation.locked_constraints.length > 0 ? (
-                <div style={{ display: "grid", gap: 10 }}>
-                  <strong style={{ color: "#0f172a" }}>Lock constraints</strong>
-                  {recommendation.locked_constraints.map((constraint) => (
-                    <div
-                      key={constraint}
-                      style={{
-                        borderRadius: 16,
-                        border: "1px solid #fde68a",
-                        background: "#fffbeb",
-                        padding: 14,
-                        color: "#92400e",
-                        lineHeight: 1.6,
-                      }}
-                    >
-                      {constraint}
+                {recommendation.locked_constraints.length > 0 && (
+                  <div style={{ display: "grid", gap: 6 }}>
+                    <div className="db-label-section">Lock Constraints</div>
+                    {recommendation.locked_constraints.map((c) => (
+                      <div key={c} className="db-alert-amber" style={{ fontSize: 12 }}>{c}</div>
+                    ))}
+                  </div>
+                )}
+
+                <div style={{ display: "grid", gap: 6 }}>
+                  <div className="db-label-section">Queue Changes</div>
+                  {recommendation.changes.map((change) => (
+                    <div key={`${change.appointment_id}-${change.to}`} style={{
+                      padding: "8px 10px",
+                      border: "1px solid var(--ds-border)",
+                      borderRadius: 6,
+                      display: "grid",
+                      gap: 3,
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: "var(--ds-text)" }}>{change.patient_name}</span>
+                        <span className={`db-badge ${change.direction === "later" ? "db-badge-amber" : "db-badge-green"}`}>
+                          {change.direction}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 11, color: "var(--ds-text-3)" }}>
+                        {formatDateTime(change.from)} → {formatDateTime(change.to)}
+                      </div>
+                      <div style={{ fontSize: 12, color: "var(--ds-text-2)", lineHeight: 1.4, marginTop: 2 }}>{change.reason}</div>
                     </div>
                   ))}
                 </div>
-              ) : null}
 
+                {displacedPatients.length > 0 && (
+                  <div className="db-alert-amber" style={{ fontSize: 12 }}>
+                    {displacedPatients.length} patient{displacedPatients.length === 1 ? "" : "s"} moved later — lower critical scores than {recommendation.patient_name}.
+                  </div>
+                )}
+              </div>
+            </SideSection>
+          )}
+
+          {/* Manual booking panel (no recommendation) */}
+          {focusPatientId && !recommendation && (
+            <SideSection title={pendingPatientName ?? "Focused Patient"} label="Book">
               <div style={{ display: "grid", gap: 10 }}>
-                <strong style={{ color: "#0f172a" }}>Queue changes</strong>
-                {recommendation.changes.map((change) => (
-                  <div
-                    key={`${change.appointment_id}-${change.to}`}
-                    style={{
-                      borderRadius: 16,
-                      border: "1px solid #e2e8f0",
-                      background: "#ffffff",
-                      padding: 14,
-                      display: "grid",
-                      gap: 6,
-                    }}
-                  >
-                    <div style={{ fontWeight: 700, color: "#0f172a" }}>
-                      {change.patient_name} · {change.direction}
-                    </div>
-                    <div style={{ fontSize: 14, color: "#475569" }}>
-                      {formatDateTime(change.from)} → {formatDateTime(change.to)}
-                    </div>
-                    <div style={{ fontSize: 14, color: "#334155", lineHeight: 1.6 }}>{change.reason}</div>
+                <div style={{ fontSize: 13, color: "var(--ds-text-2)", lineHeight: 1.5 }}>
+                  {pendingSlot ? `Selected: ${formatDateTime(pendingSlot)}` : "Click a slot on the calendar."}
+                </div>
+                {occupiedSlotSelection && (
+                  <div style={{ fontSize: 12, color: "#B45309", lineHeight: 1.5 }}>
+                    That slot is already booked for {occupiedSlotSelection.patient_name}. Pick another time.
+                  </div>
+                )}
+                <button type="button" className="db-btn db-btn-primary" style={{ fontSize: 13 }}
+                  onClick={() => void onConfirmAppointment("create")}
+                  disabled={!canCreateAdditionalAppointment || confirmingAppointment}>
+                  {confirmingAppointment ? "Creating…" : "Create Appointment"}
+                </button>
+              </div>
+            </SideSection>
+          )}
+
+          {/* HR team */}
+          <SideSection title="HR / Reception">
+            {hrEmployees.length === 0 ? (
+              <div className="db-empty">No HR employees. Add from Company page.</div>
+            ) : (
+              <div style={{ display: "grid", gap: 8 }}>
+                {hrEmployees.map((e) => (
+                  <div key={e.id} style={{ padding: "8px 10px", border: "1px solid var(--ds-border)", borderRadius: 6, background: "#FAFCFF" }}>
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>{e.full_name}</div>
+                    <div style={{ fontSize: 12, color: "var(--ds-text-3)", marginTop: 2 }}>{e.job_title ?? e.email}</div>
                   </div>
                 ))}
               </div>
+            )}
+          </SideSection>
 
-              {displacedPatients.length > 0 ? (
-                <div
-                  style={{
-                    borderRadius: 18,
-                    border: "1px solid #fed7aa",
-                    background: "#fff7ed",
-                    padding: 18,
-                    color: "#9a3412",
-                    lineHeight: 1.7,
-                  }}
-                >
-                  {displacedPatients.length} patient{displacedPatients.length === 1 ? "" : "s"} moved later because
-                  their critical scores were lower than {recommendation.patient_name}.
-                </div>
-              ) : null}
-            </article>
-          ) : null}
-
-          {focusPatientId && !recommendation ? (
-            <article
-              style={{
-                borderRadius: 24,
-                border: "1px solid #dbe2ee",
-                background: "#ffffff",
-                padding: 24,
-                display: "grid",
-                gap: 14,
-              }}
-            >
-              <div>
-                <p
-                  style={{
-                    margin: 0,
-                    fontSize: 12,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.12em",
-                    color: "#1d4ed8",
-                  }}
-                >
-                  Book Appointment
-                </p>
-                <h2 style={{ margin: "8px 0 0", fontSize: 24 }}>
-                  {pendingPatientName ?? "Focused patient"}
-                </h2>
-                <p style={{ margin: "10px 0 0", color: "#475569", lineHeight: 1.6 }}>
-                  Click a slot on the calendar to create a new appointment for this patient.
-                </p>
-              </div>
-
-              <div
-                style={{
-                  borderRadius: 18,
-                  border: "1px solid #dbeafe",
-                  background: "#ffffff",
-                  padding: 18,
-                  display: "grid",
-                  gap: 12,
-                }}
-              >
-                <div style={{ color: "#334155", lineHeight: 1.6 }}>
-                  {pendingSlot
-                    ? `Selected slot: ${formatDateTime(pendingSlot)}`
-                    : "No slot selected yet."}
-                </div>
-                <Button onClick={onConfirmAppointment} disabled={!canConfirmAppointment || confirmingAppointment}>
-                  {confirmingAppointment ? "Creating..." : "Create Appointment"}
-                </Button>
-              </div>
-            </article>
-          ) : null}
-          <article
-            style={{
-              borderRadius: 24,
-              border: "1px solid #dbe2ee",
-              background: "#ffffff",
-              padding: 24,
-              display: "grid",
-              gap: 16,
-            }}
-          >
-            <h2 style={{ margin: 0, fontSize: 24 }}>HR / reception team</h2>
-            <p style={{ margin: 0, color: "#475569", lineHeight: 1.6 }}>
-              Staff in this role keep the business workflow moving, manage intake, and support calendar changes.
-            </p>
-            <div style={{ display: "grid", gap: 12 }}>
-              {hrEmployees.length === 0 ? (
-                <div
-                  style={{
-                    borderRadius: 18,
-                    border: "1px dashed #cbd5e1",
-                    background: "#f8fafc",
-                    padding: 18,
-                    color: "#475569",
-                  }}
-                >
-                  No HR employees yet. Add reception or workflow staff from the Company page.
-                </div>
-              ) : (
-                hrEmployees.map((employee) => (
-                  <div
-                    key={employee.id}
-                    style={{
-                      borderRadius: 18,
-                      border: "1px solid #e2e8f0",
-                      padding: 16,
-                      background: "#f8fafc",
-                    }}
-                  >
-                    <strong>{employee.full_name}</strong>
-                    <div style={{ marginTop: 6, fontSize: 14, color: "#475569" }}>{employee.email}</div>
-                    <div style={{ marginTop: 4, fontSize: 14, color: "#475569" }}>
-                      {employee.job_title ?? "Workflow and calendar support"}
+          {/* Practitioners */}
+          <SideSection title="Practitioners">
+            {practitioners.length === 0 ? (
+              <div className="db-empty">No practitioners yet.</div>
+            ) : (
+              <div style={{ display: "grid", gap: 8 }}>
+                {practitioners.map((e) => (
+                  <div key={e.id} style={{ padding: "8px 10px", border: "1px solid var(--ds-green-bg)", borderRadius: 6, background: "var(--ds-green-bg)" }}>
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>{e.full_name}</div>
+                    <div style={{ fontSize: 12, color: "var(--ds-text-3)", marginTop: 2 }}>
+                      {e.department?.replaceAll("_", " ") ?? "Clinical"} · {e.email}
                     </div>
                   </div>
-                ))
-              )}
-            </div>
-          </article>
+                ))}
+              </div>
+            )}
+          </SideSection>
 
-          <article
-            style={{
-              borderRadius: 24,
-              border: "1px solid #dbe2ee",
-              background: "#ffffff",
-              padding: 24,
-              display: "grid",
-              gap: 16,
-            }}
-          >
-            <h2 style={{ margin: 0, fontSize: 24 }}>Practitioners</h2>
-            <p style={{ margin: 0, color: "#475569", lineHeight: 1.6 }}>
-              Practitioners own treatment decisions, patient review, and the critical ranking that drives schedule
-              recommendations.
-            </p>
-            <div style={{ display: "grid", gap: 12 }}>
-              {practitioners.map((employee) => (
-                <div
-                  key={employee.id}
-                  style={{
-                    borderRadius: 18,
-                    border: "1px solid #dcfce7",
-                    padding: 16,
-                    background: "#f0fdf4",
-                  }}
-                >
-                  <strong>{employee.full_name}</strong>
-                  <div style={{ marginTop: 6, fontSize: 14, color: "#475569" }}>{employee.email}</div>
-                  <div style={{ marginTop: 4, fontSize: 14, color: "#475569" }}>
-                    {employee.department?.replaceAll("_", " ") ?? "Clinical team"}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </article>
-
-          <article
-            style={{
-              borderRadius: 24,
-              border: "1px solid #dbe2ee",
-              background: "#ffffff",
-              padding: 24,
-              display: "grid",
-              gap: 12,
-            }}
-          >
-            <h2 style={{ margin: 0, fontSize: 24 }}>Workflow focus for this business</h2>
-            <div style={{ lineHeight: 1.8, color: "#334155" }}>
-              {workspace.business.workflow_summary ||
-                workspace.business.onboarding_answers.workflow_needs ||
-                "No workflow summary has been added yet."}
-            </div>
-          </article>
+          {/* Workflow summary */}
+          {(workspace.business.workflow_summary || workspace.business.onboarding_answers.workflow_needs) && (
+            <SideSection title="Workflow Focus">
+              <div style={{ fontSize: 13, color: "var(--ds-text-2)", lineHeight: 1.6 }}>
+                {workspace.business.workflow_summary || workspace.business.onboarding_answers.workflow_needs}
+              </div>
+            </SideSection>
+          )}
         </div>
-      </section>
-    </section>
+      </div>
+    </div>
   );
 }
 
 export default function SchedulePage() {
   return (
-    <Suspense fallback={<p style={{ margin: 0, color: "#64748b" }}>Loading workflow view...</p>}>
+    <Suspense fallback={<p style={{ margin: 0, color: "var(--ds-text-3)", fontSize: 13 }}>Loading workflow…</p>}>
       <SchedulePageContent />
     </Suspense>
   );

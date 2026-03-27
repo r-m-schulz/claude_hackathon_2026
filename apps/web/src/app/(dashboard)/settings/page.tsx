@@ -1,41 +1,11 @@
 "use client";
 
-import type { CSSProperties, FormEvent } from "react";
+import type { FormEvent, ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { DEPARTMENTS, type BusinessSummary } from "@triageai/shared";
-
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { apiFetch } from "@/lib/client/api";
 
-const selectStyle: CSSProperties = {
-  width: "100%",
-  borderRadius: "0.75rem",
-  border: "1px solid #d6dde8",
-  padding: "12px 14px",
-  fontSize: 14,
-  color: "#172033",
-  background: "#ffffff",
-};
-
-const textareaStyle: CSSProperties = {
-  width: "100%",
-  minHeight: 80,
-  borderRadius: "0.75rem",
-  border: "1px solid #d6dde8",
-  padding: "12px 14px",
-  fontSize: 14,
-  fontFamily: "inherit",
-  lineHeight: 1.6,
-  resize: "vertical",
-  color: "#172033",
-  background: "#ffffff",
-};
-
-type SettingsResponse = {
-  business: BusinessSummary;
-};
+type SettingsResponse = { business: BusinessSummary };
 
 type SettingsForm = {
   business_name: string;
@@ -83,6 +53,15 @@ function toFormState(business: BusinessSummary): SettingsForm {
   };
 }
 
+function FieldGroup({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="db-field">
+      <label className="db-label-field">{label}</label>
+      {children}
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const [business, setBusiness] = useState<BusinessSummary | null>(null);
   const [form, setForm] = useState<SettingsForm | null>(null);
@@ -91,6 +70,7 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
 
   async function loadSettings() {
     try {
@@ -105,43 +85,34 @@ export default function SettingsPage() {
     }
   }
 
-  useEffect(() => {
-    void loadSettings();
-  }, []);
+  useEffect(() => { void loadSettings(); }, []);
+
+  function patch(key: keyof SettingsForm) {
+    return (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+      setForm((c) => c ? { ...c, [key]: e.target.value } : c);
+  }
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
-    if (!form) {
-      return;
-    }
+    if (!form) return;
 
     setSaving(true);
     setError(null);
+    setSaved(false);
 
     try {
       const formData = new FormData();
-      Object.entries(form).forEach(([key, value]) => {
-        formData.append(key, value);
-      });
+      Object.entries(form).forEach(([k, v]) => formData.append(k, v));
+      if (logoFile)   formData.append("logo", logoFile);
+      if (headerFile) formData.append("header_image", headerFile);
 
-      if (logoFile) {
-        formData.append("logo", logoFile);
-      }
-
-      if (headerFile) {
-        formData.append("header_image", headerFile);
-      }
-
-      const response = await apiFetch<{ business: BusinessSummary }>("/api/business/settings", {
-        method: "POST",
-        body: formData,
-      });
-
+      const response = await apiFetch<{ business: BusinessSummary }>("/api/business/settings", { method: "POST", body: formData });
       setBusiness(response.business);
       setForm(toFormState(response.business));
       setLogoFile(null);
       setHeaderFile(null);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "Unable to save settings.");
     } finally {
@@ -149,300 +120,175 @@ export default function SettingsPage() {
     }
   }
 
-  if (loading || !form) {
-    return <p style={{ margin: 0, color: "#64748b" }}>Loading settings...</p>;
-  }
+  if (loading || !form) return <p style={{ margin: 0, color: "var(--ds-text-3)", fontSize: 13 }}>Loading…</p>;
 
   return (
-    <section style={{ display: "grid", gap: 20 }}>
-      <header
-        style={{
-          borderRadius: 24,
-          border: "1px solid #dbe2ee",
-          background: "#ffffff",
-          padding: 24,
-          display: "grid",
-          gap: 14,
-        }}
-      >
-        <p style={{ margin: 0, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.12em", color: "#64748b" }}>
-          Settings
-        </p>
-        <h1 style={{ margin: 0, fontSize: 34 }}>Company settings</h1>
-        <p style={{ margin: 0, color: "#475569", lineHeight: 1.6 }}>
-          Update the business details, onboarding answers, and brand assets used to tailor the workspace header and
-          company profile.
-        </p>
-      </header>
+    <form onSubmit={onSubmit} className="db-page">
 
-      {error ? (
-        <section
-          style={{
-            borderRadius: 18,
-            border: "1px solid #fecaca",
-            background: "#fef2f2",
-            padding: 18,
-            color: "#991b1b",
-          }}
-        >
-          {error}
-        </section>
-      ) : null}
+      {/* ── Page header ── */}
+      <div className="db-page-header">
+        <div className="db-page-title-row">
+          <div>
+            <div className="db-label-section">Configuration</div>
+            <h1 className="db-page-title" style={{ marginTop: 4 }}>Company Settings</h1>
+            <p className="db-page-desc">Business details, onboarding answers, and brand assets.</p>
+          </div>
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            {saved && <span className="db-badge db-badge-green">Saved</span>}
+            <button type="submit" className="db-btn db-btn-primary" disabled={saving}>
+              {saving ? "Saving…" : "Save Changes"}
+            </button>
+          </div>
+        </div>
+      </div>
 
-      <form onSubmit={onSubmit} style={{ display: "grid", gap: 20 }}>
-        <section
-          style={{
-            display: "grid",
-            gap: 20,
-            gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-          }}
-        >
-          <article
-            style={{
-              borderRadius: 24,
-              border: "1px solid #dbe2ee",
-              background: "#ffffff",
-              padding: 24,
-              display: "grid",
-              gap: 16,
-            }}
-          >
-            <h2 style={{ margin: 0, fontSize: 24 }}>Business details</h2>
-            <div style={{ display: "grid", gap: 16 }}>
-              <div style={{ display: "grid", gap: 8 }}>
-                <Label htmlFor="business_name">Business name</Label>
-                <Input
-                  id="business_name"
-                  value={form.business_name}
-                  onChange={(event) => setForm((current) => (current ? { ...current, business_name: event.target.value } : current))}
-                />
-              </div>
-              <div style={{ display: "grid", gap: 8 }}>
-                <Label htmlFor="legal_name">Legal name</Label>
-                <Input
-                  id="legal_name"
-                  value={form.legal_name}
-                  onChange={(event) => setForm((current) => (current ? { ...current, legal_name: event.target.value } : current))}
-                />
-              </div>
-              <div style={{ display: "grid", gap: 8 }}>
-                <Label htmlFor="primary_department">Primary department</Label>
-                <select
-                  id="primary_department"
-                  value={form.primary_department}
-                  onChange={(event) =>
-                    setForm((current) => (current ? { ...current, primary_department: event.target.value } : current))
-                  }
-                  style={selectStyle}
-                >
-                  <option value="" disabled>
-                    Select a department
-                  </option>
-                  {DEPARTMENTS.map((department) => (
-                    <option key={department} value={department}>
-                      {department.replaceAll("_", " ")}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div style={{ display: "grid", gap: 8 }}>
-                <Label htmlFor="support_email">Support email</Label>
-                <Input
-                  id="support_email"
-                  type="email"
-                  value={form.support_email}
-                  onChange={(event) => setForm((current) => (current ? { ...current, support_email: event.target.value } : current))}
-                />
-              </div>
-              <div style={{ display: "grid", gap: 8 }}>
-                <Label htmlFor="phone">Phone</Label>
-                <Input
-                  id="phone"
-                  value={form.phone}
-                  onChange={(event) => setForm((current) => (current ? { ...current, phone: event.target.value } : current))}
-                />
-              </div>
-              <div style={{ display: "grid", gap: 8 }}>
-                <Label htmlFor="website">Website</Label>
-                <Input
-                  id="website"
-                  value={form.website}
-                  onChange={(event) => setForm((current) => (current ? { ...current, website: event.target.value } : current))}
-                />
-              </div>
-            </div>
-          </article>
+      {error && <div className="db-alert-error">{error}</div>}
 
-          <article
-            style={{
-              borderRadius: 24,
-              border: "1px solid #dbe2ee",
-              background: "#ffffff",
-              padding: 24,
-              display: "grid",
-              gap: 16,
-            }}
-          >
-            <h2 style={{ margin: 0, fontSize: 24 }}>Header and location</h2>
-            <div style={{ display: "grid", gap: 16 }}>
-              <div style={{ display: "grid", gap: 8 }}>
-                <Label htmlFor="address_line">Address</Label>
-                <Input
-                  id="address_line"
-                  value={form.address_line}
-                  onChange={(event) => setForm((current) => (current ? { ...current, address_line: event.target.value } : current))}
-                />
-              </div>
-              <div style={{ display: "grid", gap: 8 }}>
-                <Label htmlFor="city">City</Label>
-                <Input
-                  id="city"
-                  value={form.city}
-                  onChange={(event) => setForm((current) => (current ? { ...current, city: event.target.value } : current))}
-                />
-              </div>
-              <div style={{ display: "grid", gap: 8 }}>
-                <Label htmlFor="country">Country</Label>
-                <Input
-                  id="country"
-                  value={form.country}
-                  onChange={(event) => setForm((current) => (current ? { ...current, country: event.target.value } : current))}
-                />
-              </div>
-              <div style={{ display: "grid", gap: 8 }}>
-                <Label htmlFor="timezone">Timezone</Label>
-                <Input
-                  id="timezone"
-                  value={form.timezone}
-                  onChange={(event) => setForm((current) => (current ? { ...current, timezone: event.target.value } : current))}
-                />
-              </div>
-              <div style={{ display: "grid", gap: 8 }}>
-                <Label htmlFor="hero_headline">Header headline</Label>
-                <Input
-                  id="hero_headline"
-                  value={form.hero_headline}
-                  onChange={(event) => setForm((current) => (current ? { ...current, hero_headline: event.target.value } : current))}
-                />
-              </div>
-              <div style={{ display: "grid", gap: 8 }}>
-                <Label htmlFor="hero_subheadline">Header subheadline</Label>
-                <Input
-                  id="hero_subheadline"
-                  value={form.hero_subheadline}
-                  onChange={(event) => setForm((current) => (current ? { ...current, hero_subheadline: event.target.value } : current))}
-                />
-              </div>
-            </div>
-          </article>
-        </section>
+      {/* ── Three-column grid ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16, alignItems: "start" }}>
 
-        <section
-          style={{
-            display: "grid",
-            gap: 20,
-            gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-            alignItems: "stretch",
-          }}
-        >
-          <article
-            style={{
-              borderRadius: 24,
-              border: "1px solid #dbe2ee",
-              background: "#ffffff",
-              padding: 24,
-              display: "flex",
-              flexDirection: "column",
-              gap: 14,
-              height: "100%",
-            }}
-          >
-            <h2 style={{ margin: 0, fontSize: 24 }}>Tailoring answers</h2>
-            <div
-              style={{
-                display: "grid",
-                gap: 12,
-                gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-              }}
-            >
-              {[
-                { key: "care_model", label: "Care model" },
-                { key: "patient_volume", label: "Patient volume" },
-                { key: "workflow_needs", label: "Workflow needs" },
-                { key: "brand_tone", label: "Brand tone" },
-                { key: "intake_priorities", label: "Intake priorities" },
-                { key: "brand_summary", label: "Brand summary" },
-                { key: "workflow_summary", label: "Workflow summary" },
-              ].map((field) => (
-                <div
-                  key={field.key}
-                  style={{
-                    display: "grid",
-                    gap: 6,
-                  }}
-                >
-                  <Label htmlFor={field.key}>{field.label}</Label>
-                  <textarea
-                    id={field.key}
-                    value={form[field.key as keyof SettingsForm]}
-                    onChange={(event) =>
-                      setForm((current) =>
-                        current ? { ...current, [field.key]: event.target.value } : current,
-                      )
-                    }
-                    style={textareaStyle}
-                  />
-                </div>
-              ))}
-            </div>
-          </article>
+        {/* Business details */}
+        <div className="db-card">
+          <div className="db-card-header">
+            <span className="db-card-title">Business Details</span>
+          </div>
+          <div className="db-card-body" style={{ display: "grid", gap: 12 }}>
+            <FieldGroup label="Business name">
+              <input id="business_name" className="db-input" value={form.business_name} onChange={patch("business_name")} />
+            </FieldGroup>
+            <FieldGroup label="Legal name">
+              <input id="legal_name" className="db-input" value={form.legal_name} onChange={patch("legal_name")} />
+            </FieldGroup>
+            <FieldGroup label="Primary department">
+              <select id="primary_department" className="db-select" value={form.primary_department} onChange={patch("primary_department")}>
+                <option value="" disabled>Select department</option>
+                {DEPARTMENTS.map((d) => (
+                  <option key={d} value={d}>{d.replaceAll("_", " ")}</option>
+                ))}
+              </select>
+            </FieldGroup>
+            <FieldGroup label="Support email">
+              <input id="support_email" type="email" className="db-input" value={form.support_email} onChange={patch("support_email")} />
+            </FieldGroup>
+            <FieldGroup label="Phone">
+              <input id="phone" className="db-input" value={form.phone} onChange={patch("phone")} />
+            </FieldGroup>
+            <FieldGroup label="Website">
+              <input id="website" className="db-input" value={form.website} onChange={patch("website")} />
+            </FieldGroup>
+          </div>
+        </div>
 
-          <article
-            style={{
-              borderRadius: 24,
-              border: "1px solid #dbe2ee",
-              background: "#ffffff",
-              padding: 24,
-              display: "flex",
-              flexDirection: "column",
-              gap: 14,
-              alignContent: "start",
-              height: "100%",
-            }}
-          >
-            <h2 style={{ margin: 0, fontSize: 24 }}>Brand assets</h2>
-            <div style={{ display: "grid", gap: 10 }}>
-              <div style={{ fontSize: 14, color: "#475569" }}>Current logo</div>
-              <div
-                style={{
-                  borderRadius: 18,
-                  border: "1px solid #e2e8f0",
-                  background: business?.logo_url ? `url(${business.logo_url}) center/cover` : "#f8fafc",
-                  minHeight: 90,
-                }}
-              />
-              <input type="file" accept="image/*" onChange={(event) => setLogoFile(event.target.files?.[0] ?? null)} />
+        {/* Location & header */}
+        <div className="db-card">
+          <div className="db-card-header">
+            <span className="db-card-title">Location &amp; Header</span>
+          </div>
+          <div className="db-card-body" style={{ display: "grid", gap: 12 }}>
+            <FieldGroup label="Address">
+              <input id="address_line" className="db-input" value={form.address_line} onChange={patch("address_line")} />
+            </FieldGroup>
+            <FieldGroup label="City">
+              <input id="city" className="db-input" value={form.city} onChange={patch("city")} />
+            </FieldGroup>
+            <FieldGroup label="Country">
+              <input id="country" className="db-input" value={form.country} onChange={patch("country")} />
+            </FieldGroup>
+            <FieldGroup label="Timezone">
+              <input id="timezone" className="db-input" value={form.timezone} onChange={patch("timezone")} />
+            </FieldGroup>
+            <FieldGroup label="Header headline">
+              <input id="hero_headline" className="db-input" value={form.hero_headline} onChange={patch("hero_headline")} />
+            </FieldGroup>
+            <FieldGroup label="Header subheadline">
+              <input id="hero_subheadline" className="db-input" value={form.hero_subheadline} onChange={patch("hero_subheadline")} />
+            </FieldGroup>
+          </div>
+        </div>
+
+        {/* Brand assets */}
+        <div className="db-card">
+          <div className="db-card-header">
+            <span className="db-card-title">Brand Assets</span>
+          </div>
+          <div className="db-card-body" style={{ display: "grid", gap: 16 }}>
+            <div>
+              <div className="db-label-section" style={{ marginBottom: 8 }}>Logo</div>
+              <div style={{
+                borderRadius: 6,
+                border: "1px solid var(--ds-border)",
+                background: business?.logo_url ? `url(${business.logo_url}) center/contain no-repeat` : "var(--ds-page)",
+                height: 72,
+                marginBottom: 8,
+              }} />
+              <input type="file" accept="image/*" style={{ fontSize: 12, color: "var(--ds-text-2)" }}
+                onChange={(e) => setLogoFile(e.target.files?.[0] ?? null)} />
             </div>
 
-            <div style={{ display: "grid", gap: 10 }}>
-              <div style={{ fontSize: 14, color: "#475569" }}>Current header image</div>
-              <div
-                style={{
-                  borderRadius: 18,
-                  border: "1px solid #e2e8f0",
-                  background: business?.header_image_url ? `url(${business.header_image_url}) center/cover` : "#f8fafc",
-                  minHeight: 120,
-                }}
-              />
-              <input type="file" accept="image/*" onChange={(event) => setHeaderFile(event.target.files?.[0] ?? null)} />
+            <div>
+              <div className="db-label-section" style={{ marginBottom: 8 }}>Header Image</div>
+              <div style={{
+                borderRadius: 6,
+                border: "1px solid var(--ds-border)",
+                background: business?.header_image_url ? `url(${business.header_image_url}) center/cover` : "var(--ds-page)",
+                height: 100,
+                marginBottom: 8,
+              }} />
+              <input type="file" accept="image/*" style={{ fontSize: 12, color: "var(--ds-text-2)" }}
+                onChange={(e) => setHeaderFile(e.target.files?.[0] ?? null)} />
             </div>
+          </div>
+        </div>
+      </div>
 
-            <Button type="submit" className="w-full" disabled={saving}>
-              {saving ? "Saving settings..." : "Save Company Settings"}
-            </Button>
-          </article>
-        </section>
-      </form>
-    </section>
+      {/* ── Tailoring answers ── */}
+      <div className="db-card">
+        <div className="db-card-header">
+          <span className="db-card-title">Tailoring Answers</span>
+          <span style={{ fontSize: 12, color: "var(--ds-text-3)" }}>Used by the AI to personalise scheduling recommendations</span>
+        </div>
+        <div className="db-card-body">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 14 }}>
+            {([
+              { key: "care_model",       label: "Care model" },
+              { key: "patient_volume",   label: "Patient volume" },
+              { key: "workflow_needs",   label: "Workflow needs" },
+              { key: "brand_tone",       label: "Brand tone" },
+              { key: "intake_priorities",label: "Intake priorities" },
+              { key: "brand_summary",    label: "Brand summary" },
+              { key: "workflow_summary", label: "Workflow summary" },
+            ] as { key: keyof SettingsForm; label: string }[]).map(({ key, label }) => (
+              <div key={key} className="db-field">
+                <label className="db-label-field" htmlFor={key}>{label}</label>
+                <textarea
+                  id={key}
+                  className="db-textarea"
+                  value={form[key]}
+                  onChange={patch(key)}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom save bar */}
+      <div style={{
+        position: "sticky",
+        bottom: 0,
+        background: "rgba(240,244,248,0.9)",
+        backdropFilter: "blur(8px)",
+        padding: "12px 0",
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+      }}>
+        <button type="submit" className="db-btn db-btn-primary" disabled={saving}>
+          {saving ? "Saving…" : "Save Company Settings"}
+        </button>
+        {saved && <span className="db-badge db-badge-green">Changes saved</span>}
+        {error && <span className="db-alert-error" style={{ padding: "4px 10px" }}>{error}</span>}
+      </div>
+    </form>
   );
 }

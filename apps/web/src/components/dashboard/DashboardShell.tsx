@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { BusinessWorkspaceSummary } from "@triageai/shared";
 
+import { LogoIcon } from "@/components/logo";
 import { apiFetch } from "@/lib/client/api";
 import { createSupabaseBrowserClient, getSupabaseBrowserSession } from "@/lib/client/supabase";
 
@@ -14,14 +15,23 @@ type DashboardShellProps = {
 };
 
 const navigation = [
-  { href: "/company", label: "Company" },
-  { href: "/patients", label: "Patients" },
-  { href: "/schedule", label: "Workflow" },
-  { href: "/settings", label: "Settings" },
+  { href: "/company",  label: "Company",  icon: "⊞" },
+  { href: "/patients", label: "Patients", icon: "⊕" },
+  { href: "/schedule", label: "Workflow",  icon: "⊟" },
+  { href: "/settings", label: "Settings", icon: "⊙" },
 ];
 
 function formatRole(role: string) {
   return role === "hr" ? "HR / Reception" : "Practitioner";
+}
+
+function initials(name: string) {
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
 }
 
 export default function DashboardShell({ children }: DashboardShellProps) {
@@ -37,28 +47,18 @@ export default function DashboardShell({ children }: DashboardShellProps) {
 
     async function loadWorkspace() {
       const session = await getSupabaseBrowserSession();
-
       if (!session) {
-        if (isMounted) {
-          router.replace("/login");
-        }
+        if (isMounted) router.replace("/login");
         return;
       }
 
       try {
         const nextWorkspace = await apiFetch<BusinessWorkspaceSummary>("/api/business/workspace");
-
-        if (!isMounted) {
-          return;
-        }
-
+        if (!isMounted) return;
         setWorkspace(nextWorkspace);
         setError(null);
       } catch (loadError) {
-        if (!isMounted) {
-          return;
-        }
-
+        if (!isMounted) return;
         setError(loadError instanceof Error ? loadError.message : "Unable to load workspace.");
       }
     }
@@ -66,11 +66,7 @@ export default function DashboardShell({ children }: DashboardShellProps) {
     void loadWorkspace();
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session) {
-        router.replace("/login");
-        return;
-      }
-
+      if (!session) { router.replace("/login"); return; }
       void loadWorkspace();
     });
 
@@ -85,158 +81,131 @@ export default function DashboardShell({ children }: DashboardShellProps) {
     router.replace("/login");
   }
 
-  const businessName = workspace?.business.name ?? "Business workspace";
-  const employeeName = workspace?.current_employee.full_name ?? "Loading...";
-  const employeeRole = workspace ? formatRole(workspace.current_employee.role) : "Workspace role";
+  const businessName = workspace?.business.name ?? "Loading…";
+  const employeeName = workspace?.current_employee.full_name ?? "—";
+  const employeeRole = workspace ? formatRole(workspace.current_employee.role) : "—";
+  const dept = workspace?.business.primary_department?.replaceAll("_", " ") ?? "General";
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "grid",
-        gridTemplateColumns: "300px minmax(0, 1fr)",
-        background: "#eef2f7",
-      }}
-    >
-      <aside
-        style={{
-          padding: 24,
-          background: "linear-gradient(180deg, #0f172a 0%, #102a43 58%, #115e59 100%)",
-          color: "#e2e8f0",
+    <div style={{ minHeight: "100vh", display: "grid", gridTemplateColumns: "240px 1fr", background: "var(--ds-page)" }}>
+
+      {/* ── Sidebar ── */}
+      <aside style={{
+        background: "var(--ds-sidebar)",
+        display: "flex",
+        flexDirection: "column",
+        position: "sticky",
+        top: 0,
+        height: "100vh",
+        overflow: "hidden",
+      }}>
+        {/* Brand bar */}
+        <div style={{
+          padding: "16px 16px 14px",
+          borderBottom: "1px solid var(--ds-sidebar-border)",
           display: "flex",
-          flexDirection: "column",
-          gap: 24,
-        }}
-      >
-        <div
-          style={{
-            borderRadius: 24,
-            border: "1px solid rgba(148,163,184,0.18)",
-            padding: 20,
-            background: workspace?.business.header_image_url
-              ? `linear-gradient(rgba(15, 23, 42, 0.52), rgba(15, 23, 42, 0.86)), url(${workspace.business.header_image_url}) center/cover`
-              : "rgba(15,23,42,0.2)",
-          }}
-        >
-          <p
-            style={{
-              margin: 0,
-              fontSize: 12,
-              letterSpacing: "0.18em",
-              textTransform: "uppercase",
-              color: "#93c5fd",
-            }}
-          >
-            TriageAI
-          </p>
-          <h1 style={{ margin: "12px 0 0", fontSize: 28, lineHeight: 1.1 }}>{businessName}</h1>
-          <p style={{ margin: "12px 0 0", lineHeight: 1.6, color: "rgba(226,232,240,0.86)" }}>
-            {workspace?.business.hero_headline ?? "Business-first workspace for doctors, practitioners, and HR teams."}
-          </p>
+          alignItems: "center",
+          gap: 10,
+        }}>
+          <LogoIcon />
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#E2E8F0", letterSpacing: "-0.01em" }}>TriageAI</div>
+            <div style={{ fontSize: 10, color: "rgba(148,163,184,0.7)", letterSpacing: "0.06em", textTransform: "uppercase", marginTop: 1 }}>Clinical Platform</div>
+          </div>
         </div>
 
-        <nav style={{ display: "grid", gap: 8 }}>
-          {navigation.map((item) => {
-            const isActive = pathname.startsWith(item.href);
+        {/* Workspace info */}
+        <div style={{
+          margin: "12px 12px 0",
+          padding: "10px 12px",
+          background: "rgba(255,255,255,0.04)",
+          border: "1px solid var(--ds-sidebar-border)",
+          borderRadius: 6,
+        }}>
+          <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "rgba(148,163,184,0.6)", marginBottom: 4 }}>
+            Workspace
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#CBD5E1", lineHeight: 1.35 }}>{businessName}</div>
+          <div style={{ fontSize: 11, color: "rgba(148,163,184,0.55)", marginTop: 3 }}>{dept}</div>
+        </div>
 
+        {/* Nav links */}
+        <nav style={{ marginTop: 16, flex: 1 }}>
+          {navigation.map(({ href, label }) => {
+            const isActive = pathname.startsWith(href);
             return (
               <Link
-                key={item.href}
-                href={item.href}
-                style={{
-                  borderRadius: 14,
-                  padding: "12px 14px",
-                  textDecoration: "none",
-                  fontWeight: 600,
-                  color: isActive ? "#0f172a" : "#e2e8f0",
-                  background: isActive ? "#d1fae5" : "rgba(15, 23, 42, 0.16)",
-                  border: isActive ? "1px solid rgba(209,250,229,0.95)" : "1px solid rgba(148,163,184,0.12)",
-                }}
+                key={href}
+                href={href}
+                className={`db-nav-link${isActive ? " db-nav-link-active" : ""}`}
               >
-                {item.label}
+                {label}
               </Link>
             );
           })}
         </nav>
 
-        <div
-          style={{
-            borderRadius: 20,
-            border: "1px solid rgba(148,163,184,0.18)",
-            padding: 18,
-            background: "rgba(15,23,42,0.16)",
+        {/* Quick stats */}
+        {workspace && (
+          <div style={{
+            margin: "0 12px",
+            padding: "10px 12px",
+            background: "rgba(255,255,255,0.03)",
+            border: "1px solid var(--ds-sidebar-border)",
+            borderRadius: 6,
             display: "grid",
-            gap: 12,
-          }}
-        >
-          <div>
-            <div style={{ fontWeight: 700 }}>{employeeName}</div>
-            <div style={{ fontSize: 13, color: "rgba(226,232,240,0.74)" }}>{employeeRole}</div>
+            gridTemplateColumns: "1fr 1fr",
+            gap: 10,
+          }}>
+            {[
+              { label: "Employees", value: workspace.employees.length },
+              { label: "Patients",  value: workspace.patient_count },
+            ].map(({ label, value }) => (
+              <div key={label}>
+                <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", color: "rgba(148,163,184,0.5)" }}>{label}</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: "#94A3B8", lineHeight: 1.2, marginTop: 2 }}>{value}</div>
+              </div>
+            ))}
           </div>
-          <div style={{ display: "grid", gap: 6, fontSize: 13 }}>
-            <div>{workspace ? `${workspace.employees.length} employees` : "Loading employees"}</div>
-            <div>{workspace ? `${workspace.patient_count} patients` : "Loading patients"}</div>
+        )}
+
+        {/* User */}
+        <div style={{
+          padding: "14px 12px",
+          borderTop: "1px solid var(--ds-sidebar-border)",
+          marginTop: 12,
+          display: "grid",
+          gap: 10,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{
+              width: 30, height: 30, borderRadius: "50%",
+              background: "#1E3A5F",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 11, fontWeight: 700, color: "#60A5FA",
+              flexShrink: 0,
+            }}>
+              {initials(employeeName)}
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#CBD5E1", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{employeeName}</div>
+              <div style={{ fontSize: 10, color: "rgba(148,163,184,0.55)", marginTop: 1 }}>{employeeRole}</div>
+            </div>
           </div>
-          <button
-            type="button"
-            onClick={signOut}
-            style={{
-              marginTop: 6,
-              border: "1px solid rgba(148,163,184,0.22)",
-              background: "transparent",
-              color: "#f8fafc",
-              borderRadius: 12,
-              padding: "10px 12px",
-              cursor: "pointer",
-            }}
-          >
+          <button type="button" onClick={signOut} className="db-btn db-btn-ghost-sidebar">
             Sign out
           </button>
         </div>
       </aside>
 
-      <div style={{ display: "grid", gridTemplateRows: "88px minmax(0, 1fr)" }}>
-        <header
-          style={{
-            padding: "22px 28px",
-            borderBottom: "1px solid #dbe2ee",
-            background: "rgba(255,255,255,0.78)",
-            backdropFilter: "blur(12px)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 16,
-          }}
-        >
-          <div>
-            <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.12em", color: "#64748b" }}>
-              Business Workspace
-            </div>
-            <strong style={{ fontSize: 20 }}>{businessName}</strong>
-          </div>
-          <div style={{ fontSize: 14, color: "#475569" }}>
-            {workspace?.business.support_email ?? workspace?.current_employee.email ?? "Loading contact"}
-          </div>
-        </header>
-
-        <main style={{ padding: 28, overflowY: "auto" }}>
-          {error ? (
-            <section
-              style={{
-                borderRadius: 18,
-                border: "1px solid #fecaca",
-                background: "#fef2f2",
-                padding: 18,
-                color: "#991b1b",
-              }}
-            >
-              {error}
-            </section>
-          ) : (
-            children
-          )}
-        </main>
-      </div>
+      {/* ── Main content ── */}
+      <main style={{ padding: "20px 24px", overflow: "auto", minHeight: "100vh" }}>
+        {error ? (
+          <div className="db-alert-error">{error}</div>
+        ) : (
+          children
+        )}
+      </main>
     </div>
   );
 }

@@ -1,27 +1,13 @@
 "use client";
 
-import type { CSSProperties, FormEvent } from "react";
+import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { DEPARTMENTS, type BusinessWorkspaceSummary } from "@triageai/shared";
-
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { apiFetch } from "@/lib/client/api";
 
-const selectStyle: CSSProperties = {
-  width: "100%",
-  borderRadius: "0.75rem",
-  border: "1px solid #d6dde8",
-  padding: "12px 14px",
-  fontSize: 14,
-  color: "#172033",
-  background: "#ffffff",
-};
-
 function formatRole(role: string) {
-  return role === "hr" ? "HR / Reception" : "Practitioner";
+  return role === "hr" ? "HR" : "Practitioner";
 }
 
 export default function CompanyPage() {
@@ -51,9 +37,7 @@ export default function CompanyPage() {
     }
   }
 
-  useEffect(() => {
-    void loadWorkspace();
-  }, []);
+  useEffect(() => { void loadWorkspace(); }, []);
 
   async function onCreateEmployee(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -69,15 +53,7 @@ export default function CompanyPage() {
         }),
       });
 
-      setEmployeeForm({
-        full_name: "",
-        email: "",
-        password: "",
-        role: "practitioner",
-        department: "",
-        job_title: "",
-      });
-
+      setEmployeeForm({ full_name: "", email: "", password: "", role: "practitioner", department: "", job_title: "" });
       await loadWorkspace();
     } catch (submitError) {
       setEmployeeError(submitError instanceof Error ? submitError.message : "Unable to add employee.");
@@ -86,359 +62,254 @@ export default function CompanyPage() {
     }
   }
 
-  if (loading) {
-    return <p style={{ margin: 0, color: "#64748b" }}>Loading company workspace...</p>;
-  }
+  if (loading) return <p style={{ margin: 0, color: "var(--ds-text-3)", fontSize: 13 }}>Loading…</p>;
 
   if (error || !workspace) {
-    return (
-      <section
-        style={{
-          borderRadius: 18,
-          border: "1px solid #fecaca",
-          background: "#fef2f2",
-          padding: 18,
-          color: "#991b1b",
-        }}
-      >
-        {error ?? "Unable to load company workspace."}
-      </section>
-    );
+    return <div className="db-alert-error">{error ?? "Unable to load company workspace."}</div>;
   }
 
   const { business, employees, recent_patients: recentPatients } = workspace;
+  const practitioners = employees.filter((e) => e.role === "practitioner");
+  const hrStaff = employees.filter((e) => e.role === "hr");
 
   return (
-    <section style={{ display: "grid", gap: 20 }}>
-      <section
-        style={{
-          borderRadius: 28,
-          border: "1px solid #dbe2ee",
-          padding: 28,
-          background: business.header_image_url
-            ? `linear-gradient(rgba(15,23,42,0.52), rgba(15,23,42,0.8)), url(${business.header_image_url}) center/cover`
-            : "linear-gradient(135deg, #0f172a 0%, #115e59 100%)",
-          color: "#f8fafc",
-          display: "grid",
-          gap: 24,
-        }}
-      >
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-          <div style={{ maxWidth: 700 }}>
-            <p style={{ margin: 0, fontSize: 12, letterSpacing: "0.16em", textTransform: "uppercase", color: "#bfdbfe" }}>
-              Company Workspace
-            </p>
-            <h1 style={{ margin: "10px 0 0", fontSize: 40, lineHeight: 1.05 }}>{business.name}</h1>
-            <p style={{ margin: "14px 0 0", maxWidth: 560, lineHeight: 1.7, color: "rgba(226,232,240,0.88)" }}>
-              {business.hero_headline ?? "Business workspace tailored to your clinic."}
-            </p>
-            {business.hero_subheadline ? (
-              <p style={{ margin: "10px 0 0", maxWidth: 620, lineHeight: 1.65, color: "rgba(226,232,240,0.76)" }}>
-                {business.hero_subheadline}
-              </p>
-            ) : null}
-          </div>
+    <div className="db-page">
 
-          <div
-            style={{
-              minWidth: 240,
-              borderRadius: 22,
-              border: "1px solid rgba(148,163,184,0.26)",
-              background: "rgba(15,23,42,0.26)",
-              padding: 18,
-              display: "grid",
-              gap: 8,
-            }}
-          >
-            <div>{employees.length} employees</div>
-            <div>{workspace.patient_count} patients</div>
-            <div>{business.primary_department?.replaceAll("_", " ") ?? "General practice"}</div>
-            <div>{business.city ? `${business.city}, ${business.country ?? ""}`.trim() : business.timezone ?? "Europe/Dublin"}</div>
+      {/* ── Page header ── */}
+      <div className="db-page-header">
+        <div className="db-page-title-row">
+          <div>
+            <div className="db-label-section">Company Workspace</div>
+            <h1 className="db-page-title" style={{ marginTop: 4 }}>{business.name}</h1>
+            {business.hero_headline && (
+              <p className="db-page-desc">{business.hero_headline}</p>
+            )}
           </div>
+          <Link href="/settings" className="db-btn db-btn-secondary">Settings</Link>
         </div>
 
-        <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
+        <div className="db-stat-row">
           {[
-            { label: "Care model", value: business.onboarding_answers.care_model || "Not provided yet" },
-            { label: "Patient volume", value: business.onboarding_answers.patient_volume || "Not provided yet" },
-            { label: "Workflow needs", value: business.onboarding_answers.workflow_needs || "Not provided yet" },
-            { label: "Brand tone", value: business.onboarding_answers.brand_tone || "Not provided yet" },
-          ].map((item) => (
-            <div
-              key={item.label}
-              style={{
-                borderRadius: 18,
-                padding: 16,
-                border: "1px solid rgba(148,163,184,0.24)",
-                background: "rgba(15,23,42,0.24)",
-                minHeight: 120,
-              }}
-            >
-              <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.08em", color: "#bfdbfe" }}>
-                {item.label}
-              </div>
-              <div style={{ marginTop: 10, lineHeight: 1.6 }}>{item.value}</div>
+            { label: "Employees",   value: employees.length },
+            { label: "Practitioners", value: practitioners.length },
+            { label: "HR / Reception", value: hrStaff.length },
+            { label: "Patients",    value: workspace.patient_count },
+          ].map(({ label, value }) => (
+            <div key={label} className="db-stat-chip">
+              <div className="db-stat-chip-label">{label}</div>
+              <div className="db-stat-chip-value">{value}</div>
             </div>
           ))}
+          {business.city && (
+            <div className="db-stat-chip">
+              <div className="db-stat-chip-label">Location</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ds-text)", marginTop: 4 }}>
+                {business.city}{business.country ? `, ${business.country}` : ""}
+              </div>
+            </div>
+          )}
+          {business.primary_department && (
+            <div className="db-stat-chip">
+              <div className="db-stat-chip-label">Department</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ds-text)", marginTop: 4 }}>
+                {business.primary_department.replaceAll("_", " ")}
+              </div>
+            </div>
+          )}
         </div>
-      </section>
+      </div>
 
-      <section
-        style={{
-          display: "grid",
-          gap: 20,
-          gridTemplateColumns: "minmax(0, 1.1fr) minmax(320px, 0.9fr)",
-          alignItems: "stretch",
-        }}
-      >
-        <div style={{ display: "grid", gap: 18, gridTemplateRows: "auto 1fr", height: "100%" }}>
-          <article
-            style={{
-              background: "#ffffff",
-              border: "1px solid #dbe2ee",
-              borderRadius: 24,
-              padding: 24,
-              display: "grid",
-              gap: 18,
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
-              <div>
-                <h2 style={{ margin: 0, fontSize: 26 }}>Employees</h2>
-                <p style={{ marginTop: 8, color: "#475569", lineHeight: 1.6 }}>
-                  Manage practitioners and HR / reception staff from the company view.
-                </p>
+      {/* ── Onboarding metrics ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+        {[
+          { label: "Care model",    value: business.onboarding_answers.care_model },
+          { label: "Patient volume", value: business.onboarding_answers.patient_volume },
+          { label: "Workflow needs", value: business.onboarding_answers.workflow_needs },
+          { label: "Brand tone",    value: business.onboarding_answers.brand_tone },
+        ].map(({ label, value }) => (
+          <div key={label} className="db-card" style={{ padding: "12px 14px" }}>
+            <div className="db-label-section" style={{ marginBottom: 6 }}>{label}</div>
+            <div style={{ fontSize: 13, color: "var(--ds-text-2)", lineHeight: 1.5 }}>
+              {value || <span style={{ color: "var(--ds-text-3)", fontStyle: "italic" }}>Not set</span>}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Main grid ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 280px", gap: 16, alignItems: "start" }}>
+
+        {/* Left column */}
+        <div style={{ display: "grid", gap: 16 }}>
+
+          {/* Employees table */}
+          <div className="db-card">
+            <div className="db-card-header">
+              <span className="db-card-title">Employees</span>
+              <span style={{ fontSize: 12, color: "var(--ds-text-3)" }}>{employees.length} total</span>
+            </div>
+            {employees.length === 0 ? (
+              <div style={{ padding: 16 }}>
+                <div className="db-empty">No employees yet. Use the form to add the first team member.</div>
               </div>
-              <Button asChild variant="outline">
-                <Link href="/settings">Open settings</Link>
-              </Button>
-            </div>
+            ) : (
+              <table className="db-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Role</th>
+                    <th>Department</th>
+                    <th>Title</th>
+                    <th>Email</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {employees.map((employee) => (
+                    <tr key={employee.id}>
+                      <td>
+                        <div style={{ fontWeight: 600 }}>{employee.full_name}</div>
+                        {employee.is_owner && (
+                          <span className="db-badge db-badge-blue" style={{ marginTop: 3 }}>Owner</span>
+                        )}
+                      </td>
+                      <td>
+                        <span className={`db-badge ${employee.role === "practitioner" ? "db-badge-green" : "db-badge-gray"}`}>
+                          {formatRole(employee.role)}
+                        </span>
+                      </td>
+                      <td style={{ color: "var(--ds-text-2)" }}>
+                        {employee.department ? employee.department.replaceAll("_", " ") : "—"}
+                      </td>
+                      <td style={{ color: "var(--ds-text-2)" }}>
+                        {employee.job_title || "—"}
+                      </td>
+                      <td style={{ color: "var(--ds-text-3)", fontSize: 12 }}>{employee.email}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
 
-            <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
-              {employees.map((employee) => (
-                <article
-                  key={employee.id}
-                  style={{
-                    borderRadius: 18,
-                    border: "1px solid #e2e8f0",
-                    padding: 18,
-                    display: "grid",
-                    gap: 8,
-                    background: employee.role === "hr" ? "#f8fafc" : "#f0fdf4",
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                    <strong>{employee.full_name}</strong>
-                    <span
-                      style={{
-                        fontSize: 12,
-                        borderRadius: 999,
-                        background: "#ffffff",
-                        border: "1px solid #dbe2ee",
-                        padding: "4px 8px",
-                        textTransform: "uppercase",
-                      }}
-                    >
-                      {formatRole(employee.role)}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: 14, color: "#475569" }}>{employee.email}</div>
-                  <div style={{ fontSize: 14, color: "#475569" }}>
-                    {employee.department ? employee.department.replaceAll("_", " ") : "Operations"}
-                  </div>
-                  <div style={{ fontSize: 14, color: "#475569" }}>
-                    {employee.job_title || (employee.is_owner ? "Owner" : "Team member")}
-                  </div>
-                </article>
-              ))}
+          {/* Recent patients */}
+          <div className="db-card">
+            <div className="db-card-header">
+              <span className="db-card-title">Recent Patients</span>
+              <Link href="/patients" className="db-btn db-btn-secondary" style={{ fontSize: 12, padding: "5px 10px" }}>
+                View all
+              </Link>
             </div>
-          </article>
-
-          <article
-            style={{
-              background: "#ffffff",
-              border: "1px solid #dbe2ee",
-              borderRadius: 24,
-              padding: 24,
-              display: "flex",
-              flexDirection: "column",
-              gap: 18,
-              height: "100%",
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
-              <div>
-                <h2 style={{ margin: 0, fontSize: 26 }}>Recent patients</h2>
-                <p style={{ marginTop: 8, color: "#475569", lineHeight: 1.6 }}>
-                  The company view keeps patients and employee workflows together.
-                </p>
+            {recentPatients.length === 0 ? (
+              <div style={{ padding: 16 }}>
+                <div className="db-empty">No patients yet. Add from the Patients page.</div>
               </div>
-              <Button asChild variant="outline">
-                <Link href="/patients">Open full patient list</Link>
-              </Button>
-            </div>
-
-            <div style={{ display: "grid", gap: 12, flex: 1, alignContent: "start" }}>
-              {recentPatients.length === 0 ? (
-                <div
-                  style={{
-                    borderRadius: 18,
-                    border: "1px dashed #cbd5e1",
-                    background: "#f8fafc",
-                    padding: 18,
-                    color: "#475569",
-                  }}
-                >
-                  No patients yet. Add your first patient from the Patients page.
-                </div>
-              ) : (
-                recentPatients.map((patient) => (
-                  <div
-                    key={patient.id}
-                    style={{
-                      borderRadius: 18,
-                      border: "1px solid #e2e8f0",
-                      padding: 18,
-                      display: "flex",
-                      justifyContent: "space-between",
-                      gap: 16,
-                      alignItems: "center",
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    <div>
-                      <strong>{patient.full_name}</strong>
-                      <div style={{ marginTop: 6, fontSize: 14, color: "#475569", lineHeight: 1.6 }}>
-                        {patient.department.replaceAll("_", " ")} | {patient.primary_practitioner_name ?? "Unassigned"} |{" "}
-                        {patient.is_paired ? "Paired account" : "Not paired"}
-                      </div>
-                    </div>
-                    <Button asChild>
-                      <Link href={`/patients/${patient.id}`}>Open profile</Link>
-                    </Button>
-                  </div>
-                ))
-              )}
-            </div>
-          </article>
+            ) : (
+              <table className="db-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Department</th>
+                    <th>Practitioner</th>
+                    <th>Status</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentPatients.map((patient) => (
+                    <tr key={patient.id}>
+                      <td style={{ fontWeight: 600 }}>{patient.full_name}</td>
+                      <td style={{ color: "var(--ds-text-2)" }}>{patient.department.replaceAll("_", " ")}</td>
+                      <td style={{ color: "var(--ds-text-2)" }}>{patient.primary_practitioner_name ?? "Unassigned"}</td>
+                      <td>
+                        <span className={`db-dot ${patient.is_paired ? "db-dot-green" : "db-dot-amber"}`}>
+                          {patient.is_paired ? "Paired" : "Unpaired"}
+                        </span>
+                      </td>
+                      <td>
+                        <Link href={`/patients/${patient.id}`} className="db-btn db-btn-secondary" style={{ fontSize: 12, padding: "4px 9px" }}>
+                          Profile
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
         </div>
 
-        <form
-          onSubmit={onCreateEmployee}
-          style={{
-            background: "#ffffff",
-            border: "1px solid #dbe2ee",
-            borderRadius: 24,
-            padding: 24,
-            display: "grid",
-            gap: 16,
-            alignContent: "start",
-            height: "100%",
-          }}
-        >
+        {/* Right: Add employee form */}
+        <form onSubmit={onCreateEmployee} className="db-card" style={{ padding: 16, display: "grid", gap: 12 }}>
           <div>
-            <h2 style={{ margin: 0, fontSize: 24 }}>Add employee</h2>
-            <p style={{ marginTop: 8, color: "#475569", lineHeight: 1.6 }}>
-              Practitioners get clinical access. HR handles workflow and calendar support.
-            </p>
+            <div className="db-card-title">Add Employee</div>
+            <div style={{ fontSize: 12, color: "var(--ds-text-3)", marginTop: 3, lineHeight: 1.5 }}>
+              Practitioners get clinical access; HR handles workflow and scheduling.
+            </div>
           </div>
 
-          <div style={{ display: "grid", gap: 8 }}>
-            <Label htmlFor="employee_name">Full name</Label>
-            <Input
-              id="employee_name"
-              value={employeeForm.full_name}
-              onChange={(event) => setEmployeeForm((current) => ({ ...current, full_name: event.target.value }))}
-              placeholder="Jordan Casey"
-              required
-            />
-          </div>
+          <hr className="db-divider" />
 
-          <div style={{ display: "grid", gap: 8 }}>
-            <Label htmlFor="employee_email">Email</Label>
-            <Input
-              id="employee_email"
-              type="email"
-              value={employeeForm.email}
-              onChange={(event) => setEmployeeForm((current) => ({ ...current, email: event.target.value }))}
-              placeholder="jordan@clinic.ie"
-              required
-            />
-          </div>
+          {[
+            { id: "employee_name", label: "Full name", key: "full_name", type: "text", placeholder: "Jordan Casey", required: true },
+            { id: "employee_email", label: "Email", key: "email", type: "email", placeholder: "jordan@clinic.ie", required: true },
+            { id: "employee_password", label: "Temp password", key: "password", type: "password", placeholder: "••••••••", required: true },
+            { id: "employee_title", label: "Job title", key: "job_title", type: "text", placeholder: employeeForm.role === "hr" ? "Reception lead" : "Consultant", required: false },
+          ].map(({ id, label, key, type, placeholder, required }) => (
+            <div key={id} className="db-field">
+              <label className="db-label-field" htmlFor={id}>{label}</label>
+              <input
+                id={id}
+                type={type}
+                required={required}
+                placeholder={placeholder}
+                className="db-input"
+                value={employeeForm[key as keyof typeof employeeForm]}
+                onChange={(e) => setEmployeeForm((c) => ({ ...c, [key]: e.target.value }))}
+              />
+            </div>
+          ))}
 
-          <div style={{ display: "grid", gap: 8 }}>
-            <Label htmlFor="employee_password">Temporary password</Label>
-            <Input
-              id="employee_password"
-              type="password"
-              value={employeeForm.password}
-              onChange={(event) => setEmployeeForm((current) => ({ ...current, password: event.target.value }))}
-              placeholder="Temporary password"
-              required
-            />
-          </div>
-
-          <div style={{ display: "grid", gap: 8 }}>
-            <Label htmlFor="employee_role">Role</Label>
+          <div className="db-field">
+            <label className="db-label-field" htmlFor="employee_role">Role</label>
             <select
               id="employee_role"
+              className="db-select"
               value={employeeForm.role}
-              onChange={(event) =>
-                setEmployeeForm((current) => ({
-                  ...current,
-                  role: event.target.value,
-                  department: event.target.value === "practitioner" ? current.department : "",
-                }))
-              }
-              style={selectStyle}
+              onChange={(e) => setEmployeeForm((c) => ({
+                ...c, role: e.target.value,
+                department: e.target.value === "practitioner" ? c.department : "",
+              }))}
             >
               <option value="practitioner">Practitioner</option>
               <option value="hr">HR / Reception</option>
             </select>
           </div>
 
-          {employeeForm.role === "practitioner" ? (
-            <div style={{ display: "grid", gap: 8 }}>
-              <Label htmlFor="employee_department">Department</Label>
+          {employeeForm.role === "practitioner" && (
+            <div className="db-field">
+              <label className="db-label-field" htmlFor="employee_department">Department</label>
               <select
                 id="employee_department"
+                className="db-select"
                 value={employeeForm.department}
-                onChange={(event) =>
-                  setEmployeeForm((current) => ({ ...current, department: event.target.value }))
-                }
-                style={selectStyle}
                 required
+                onChange={(e) => setEmployeeForm((c) => ({ ...c, department: e.target.value }))}
               >
-                <option value="" disabled>
-                  Select a department
-                </option>
-                {DEPARTMENTS.map((department) => (
-                  <option key={department} value={department}>
-                    {department.replaceAll("_", " ")}
-                  </option>
+                <option value="" disabled>Select department</option>
+                {DEPARTMENTS.map((d) => (
+                  <option key={d} value={d}>{d.replaceAll("_", " ")}</option>
                 ))}
               </select>
             </div>
-          ) : null}
+          )}
 
-          <div style={{ display: "grid", gap: 8 }}>
-            <Label htmlFor="employee_title">Job title</Label>
-            <Input
-              id="employee_title"
-              value={employeeForm.job_title}
-              onChange={(event) => setEmployeeForm((current) => ({ ...current, job_title: event.target.value }))}
-              placeholder={employeeForm.role === "hr" ? "Reception lead" : "Consultant dermatologist"}
-            />
-          </div>
+          {employeeError && <div className="db-alert-error">{employeeError}</div>}
 
-          {employeeError ? <p style={{ margin: 0, fontSize: 14, color: "#b91c1c" }}>{employeeError}</p> : null}
-
-          <Button type="submit" className="w-full" disabled={savingEmployee}>
-            {savingEmployee ? "Adding employee..." : "Add Employee"}
-          </Button>
+          <button type="submit" className="db-btn db-btn-primary" disabled={savingEmployee} style={{ width: "100%" }}>
+            {savingEmployee ? "Adding…" : "Add Employee"}
+          </button>
         </form>
-      </section>
-
-    </section>
+      </div>
+    </div>
   );
 }

@@ -1,24 +1,10 @@
 "use client";
 
-import type { CSSProperties, FormEvent } from "react";
+import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { DEPARTMENTS, type BusinessPatientSummary, type BusinessWorkspaceSummary } from "@triageai/shared";
-
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { apiFetch } from "@/lib/client/api";
-
-const selectStyle: CSSProperties = {
-  width: "100%",
-  borderRadius: "0.75rem",
-  border: "1px solid #d6dde8",
-  padding: "12px 14px",
-  fontSize: 14,
-  color: "#172033",
-  background: "#ffffff",
-};
 
 export default function PatientsPage() {
   const [patients, setPatients] = useState<BusinessPatientSummary[]>([]);
@@ -39,7 +25,7 @@ export default function PatientsPage() {
   });
 
   const practitioners = useMemo(
-    () => workspace?.employees.filter((employee) => employee.role === "practitioner") ?? [],
+    () => workspace?.employees.filter((e) => e.role === "practitioner") ?? [],
     [workspace],
   );
 
@@ -49,7 +35,6 @@ export default function PatientsPage() {
         apiFetch<BusinessWorkspaceSummary>("/api/business/workspace"),
         apiFetch<{ patients: BusinessPatientSummary[] }>("/api/business/patients"),
       ]);
-
       setWorkspace(workspaceResponse);
       setPatients(patientResponse.patients);
       setError(null);
@@ -60,9 +45,7 @@ export default function PatientsPage() {
     }
   }
 
-  useEffect(() => {
-    void loadData();
-  }, []);
+  useEffect(() => { void loadData(); }, []);
 
   async function onCreatePatient(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -80,17 +63,7 @@ export default function PatientsPage() {
         }),
       });
 
-      setForm({
-        full_name: "",
-        email: "",
-        phone: "",
-        dob: "",
-        department: "",
-        assigned_practitioner_id: "",
-        portal_email: "",
-        portal_password: "",
-      });
-
+      setForm({ full_name: "", email: "", phone: "", dob: "", department: "", assigned_practitioner_id: "", portal_email: "", portal_password: "" });
       await loadData();
     } catch (submitError) {
       setPatientError(submitError instanceof Error ? submitError.message : "Unable to create patient.");
@@ -100,311 +73,202 @@ export default function PatientsPage() {
   }
 
   async function onDeletePatient(patientId: string) {
-    const confirmed = window.confirm("Remove this patient from the business workspace?");
-
-    if (!confirmed) {
-      return;
-    }
+    if (!window.confirm("Remove this patient from the business workspace?")) return;
 
     try {
-      await apiFetch(`/api/business/patients/${patientId}`, {
-        method: "DELETE",
-      });
-
+      await apiFetch(`/api/business/patients/${patientId}`, { method: "DELETE" });
       await loadData();
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : "Unable to remove patient.");
     }
   }
 
-  if (loading) {
-    return <p style={{ margin: 0, color: "#64748b" }}>Loading patients...</p>;
-  }
+  if (loading) return <p style={{ margin: 0, color: "var(--ds-text-3)", fontSize: 13 }}>Loading…</p>;
+  if (error)   return <div className="db-alert-error">{error}</div>;
 
-  if (error) {
-    return (
-      <section
-        style={{
-          borderRadius: 18,
-          border: "1px solid #fecaca",
-          background: "#fef2f2",
-          padding: 18,
-          color: "#991b1b",
-        }}
-      >
-        {error}
-      </section>
-    );
-  }
+  const paired   = patients.filter((p) => p.is_paired).length;
+  const unpaired = patients.length - paired;
 
   return (
-    <section style={{ display: "grid", gap: 20 }}>
-      <header
-        style={{
-          borderRadius: 24,
-          border: "1px solid #dbe2ee",
-          padding: 24,
-          background: "#ffffff",
-          display: "flex",
-          justifyContent: "space-between",
-          gap: 16,
-          flexWrap: "wrap",
-        }}
-      >
-        <div>
-          <p style={{ margin: 0, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.12em", color: "#64748b" }}>
-            Patient Management
-          </p>
-          <h1 style={{ margin: "8px 0 0", fontSize: 34 }}>Patients</h1>
-          <p style={{ margin: "10px 0 0", color: "#475569", lineHeight: 1.6 }}>
-            Add new patients, pair portal accounts, and keep notes and uploaded context tied to the business record.
-          </p>
-        </div>
-        <div
-          style={{
-            minWidth: 220,
-            borderRadius: 20,
-            border: "1px solid #e2e8f0",
-            padding: 18,
-            background: "#f8fafc",
-          }}
-        >
-          <div style={{ fontWeight: 700 }}>{patients.length} patient records</div>
-          <div style={{ marginTop: 8, fontSize: 14, color: "#475569", lineHeight: 1.6 }}>
-            {practitioners.length} practitioners available for assignment.
-          </div>
-        </div>
-      </header>
+    <div className="db-page">
 
-      <section
-        style={{
-          display: "grid",
-          gap: 20,
-          gridTemplateColumns: "minmax(0, 1.15fr) minmax(320px, 0.85fr)",
-          alignItems: "stretch",
-        }}
-      >
-        <article
-          style={{
-            background: "#ffffff",
-            border: "1px solid #dbe2ee",
-            borderRadius: 24,
-            padding: 24,
-            display: "flex",
-            flexDirection: "column",
-            gap: 16,
-            height: "100%",
-          }}
-        >
+      {/* ── Page header ── */}
+      <div className="db-page-header">
+        <div className="db-page-title-row">
           <div>
-            <h2 style={{ margin: 0, fontSize: 24 }}>Current patients</h2>
-            <p style={{ marginTop: 8, color: "#475569", lineHeight: 1.6 }}>
-              Each patient profile can hold notes, uploaded images or PDFs, extracted text, and paired login details.
-            </p>
+            <div className="db-label-section">Patient Management</div>
+            <h1 className="db-page-title" style={{ marginTop: 4 }}>Patients</h1>
+            <p className="db-page-desc">Add records, pair portal accounts, and manage clinical assignments.</p>
+          </div>
+        </div>
+
+        <div className="db-stat-row">
+          {[
+            { label: "Total patients",   value: patients.length },
+            { label: "Portal paired",    value: paired },
+            { label: "Unpaired",         value: unpaired },
+            { label: "Practitioners",    value: practitioners.length },
+          ].map(({ label, value }) => (
+            <div key={label} className="db-stat-chip">
+              <div className="db-stat-chip-label">{label}</div>
+              <div className="db-stat-chip-value">{value}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Main grid ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 280px", gap: 16, alignItems: "start" }}>
+
+        {/* Patient table */}
+        <div className="db-card">
+          <div className="db-card-header">
+            <span className="db-card-title">All Patients</span>
+            <span style={{ fontSize: 12, color: "var(--ds-text-3)" }}>{patients.length} records</span>
           </div>
 
-          <div style={{ display: "grid", gap: 12, flex: 1, alignContent: "start" }}>
-            {patients.length === 0 ? (
-              <div
-                style={{
-                  borderRadius: 18,
-                  border: "1px dashed #cbd5e1",
-                  background: "#f8fafc",
-                  padding: 18,
-                  color: "#475569",
-                }}
-              >
-                No patients yet. Use the form to add the first patient.
-              </div>
-            ) : (
-              patients.map((patient) => (
-                <div
-                  key={patient.id}
-                  style={{
-                    borderRadius: 18,
-                    border: "1px solid #e2e8f0",
-                    padding: 18,
-                    display: "grid",
-                    gap: 12,
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-                    <div>
-                      <strong>{patient.full_name}</strong>
-                      <div style={{ marginTop: 6, fontSize: 14, color: "#475569", lineHeight: 1.6 }}>
-                        {patient.department.replaceAll("_", " ")} | {patient.primary_practitioner_name ?? "Unassigned"}
+          {patients.length === 0 ? (
+            <div style={{ padding: 16 }}>
+              <div className="db-empty">No patients yet. Use the form to add the first record.</div>
+            </div>
+          ) : (
+            <table className="db-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>DOB</th>
+                  <th>Department</th>
+                  <th>Practitioner</th>
+                  <th>Contact</th>
+                  <th>Status</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {patients.map((patient) => (
+                  <tr key={patient.id}>
+                    <td>
+                      <div style={{ fontWeight: 600 }}>{patient.full_name}</div>
+                    </td>
+                    <td style={{ color: "var(--ds-text-2)", fontSize: 12, fontVariantNumeric: "tabular-nums" }}>
+                      {patient.dob}
+                    </td>
+                    <td style={{ color: "var(--ds-text-2)" }}>
+                      {patient.department.replaceAll("_", " ")}
+                    </td>
+                    <td style={{ color: "var(--ds-text-2)" }}>
+                      {patient.primary_practitioner_name ?? <span style={{ color: "var(--ds-text-3)" }}>Unassigned</span>}
+                    </td>
+                    <td style={{ fontSize: 12, color: "var(--ds-text-3)" }}>
+                      {patient.email ?? patient.phone ?? "—"}
+                    </td>
+                    <td>
+                      <span className={`db-dot ${patient.is_paired ? "db-dot-green" : "db-dot-amber"}`}>
+                        {patient.is_paired ? "Paired" : "Unpaired"}
+                      </span>
+                    </td>
+                    <td>
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <Link href={`/patients/${patient.id}`} className="db-btn db-btn-secondary" style={{ fontSize: 12, padding: "4px 9px" }}>
+                          Profile
+                        </Link>
+                        <button
+                          type="button"
+                          className="db-btn db-btn-danger"
+                          style={{ fontSize: 12, padding: "4px 9px" }}
+                          onClick={() => onDeletePatient(patient.id)}
+                        >
+                          Remove
+                        </button>
                       </div>
-                    </div>
-                    <div
-                      style={{
-                        borderRadius: 999,
-                        padding: "6px 10px",
-                        fontSize: 12,
-                        fontWeight: 700,
-                        textTransform: "uppercase",
-                        background: patient.is_paired ? "#dcfce7" : "#fef3c7",
-                        color: patient.is_paired ? "#166534" : "#92400e",
-                        alignSelf: "start",
-                      }}
-                    >
-                      {patient.is_paired ? "Paired" : "Unpaired"}
-                    </div>
-                  </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
 
-                  <div style={{ fontSize: 14, color: "#475569", lineHeight: 1.6 }}>
-                    {patient.email ?? "No email"} | {patient.phone ?? "No phone"} | DOB {patient.dob}
-                  </div>
-
-                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                    <Button asChild>
-                      <Link href={`/patients/${patient.id}`}>Open profile</Link>
-                    </Button>
-                    <Button type="button" variant="outline" onClick={() => onDeletePatient(patient.id)}>
-                      Remove patient
-                    </Button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </article>
-
-        <form
-          onSubmit={onCreatePatient}
-          style={{
-            background: "#ffffff",
-            border: "1px solid #dbe2ee",
-            borderRadius: 24,
-            padding: 24,
-            display: "grid",
-            gap: 16,
-            alignContent: "start",
-          }}
-        >
+        {/* Add patient form */}
+        <form onSubmit={onCreatePatient} className="db-card" style={{ padding: 16, display: "grid", gap: 12 }}>
           <div>
-            <h2 style={{ margin: 0, fontSize: 24 }}>Add patient</h2>
-            <p style={{ marginTop: 8, color: "#475569", lineHeight: 1.6 }}>
-              Create the business-side record now. Pair a portal account now or later from the patient profile.
-            </p>
+            <div className="db-card-title">Add Patient</div>
+            <div style={{ fontSize: 12, color: "var(--ds-text-3)", marginTop: 3, lineHeight: 1.5 }}>
+              Pair a portal account now or later from the patient profile.
+            </div>
           </div>
 
-          <div style={{ display: "grid", gap: 8 }}>
-            <Label htmlFor="full_name">Full name</Label>
-            <Input
-              id="full_name"
-              value={form.full_name}
-              onChange={(event) => setForm((current) => ({ ...current, full_name: event.target.value }))}
-              required
-            />
+          <hr className="db-divider" />
+
+          <div className="db-field">
+            <label className="db-label-field" htmlFor="full_name">Full name</label>
+            <input id="full_name" type="text" required className="db-input" value={form.full_name}
+              onChange={(e) => setForm((c) => ({ ...c, full_name: e.target.value }))} />
           </div>
 
-          <div style={{ display: "grid", gap: 8 }}>
-            <Label htmlFor="email">Contact email</Label>
-            <Input
-              id="email"
-              type="email"
-              value={form.email}
-              onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
-            />
+          <div className="db-field">
+            <label className="db-label-field" htmlFor="email">Contact email</label>
+            <input id="email" type="email" className="db-input" value={form.email}
+              onChange={(e) => setForm((c) => ({ ...c, email: e.target.value }))} />
           </div>
 
-          <div style={{ display: "grid", gap: 8 }}>
-            <Label htmlFor="phone">Phone</Label>
-            <Input
-              id="phone"
-              value={form.phone}
-              onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))}
-            />
+          <div className="db-field">
+            <label className="db-label-field" htmlFor="phone">Phone</label>
+            <input id="phone" type="text" className="db-input" value={form.phone}
+              onChange={(e) => setForm((c) => ({ ...c, phone: e.target.value }))} />
           </div>
 
-          <div style={{ display: "grid", gap: 8 }}>
-            <Label htmlFor="dob">Date of birth</Label>
-            <Input
-              id="dob"
-              type="date"
-              value={form.dob}
-              onChange={(event) => setForm((current) => ({ ...current, dob: event.target.value }))}
-              required
-            />
+          <div className="db-field">
+            <label className="db-label-field" htmlFor="dob">Date of birth</label>
+            <input id="dob" type="date" required className="db-input" value={form.dob}
+              onChange={(e) => setForm((c) => ({ ...c, dob: e.target.value }))} />
           </div>
 
-          <div style={{ display: "grid", gap: 8 }}>
-            <Label htmlFor="department">Department</Label>
-            <select
-              id="department"
-              value={form.department}
-              onChange={(event) => setForm((current) => ({ ...current, department: event.target.value }))}
-              style={selectStyle}
-              required
-            >
-              <option value="" disabled>
-                Select a department
-              </option>
-              {DEPARTMENTS.map((department) => (
-                <option key={department} value={department}>
-                  {department.replaceAll("_", " ")}
-                </option>
+          <div className="db-field">
+            <label className="db-label-field" htmlFor="department">Department</label>
+            <select id="department" required className="db-select" value={form.department}
+              onChange={(e) => setForm((c) => ({ ...c, department: e.target.value }))}>
+              <option value="" disabled>Select department</option>
+              {DEPARTMENTS.map((d) => (
+                <option key={d} value={d}>{d.replaceAll("_", " ")}</option>
               ))}
             </select>
           </div>
 
-          <div style={{ display: "grid", gap: 8 }}>
-            <Label htmlFor="assigned_practitioner">Assigned practitioner</Label>
-            <select
-              id="assigned_practitioner"
-              value={form.assigned_practitioner_id}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, assigned_practitioner_id: event.target.value }))
-              }
-              style={selectStyle}
-            >
+          <div className="db-field">
+            <label className="db-label-field" htmlFor="assigned_practitioner">Assigned practitioner</label>
+            <select id="assigned_practitioner" className="db-select" value={form.assigned_practitioner_id}
+              onChange={(e) => setForm((c) => ({ ...c, assigned_practitioner_id: e.target.value }))}>
               <option value="">Leave unassigned</option>
-              {practitioners.map((employee) => (
-                <option key={employee.id} value={employee.linked_clinician_id ?? ""}>
-                  {employee.full_name}
-                </option>
+              {practitioners.map((e) => (
+                <option key={e.id} value={e.linked_clinician_id ?? ""}>{e.full_name}</option>
               ))}
             </select>
           </div>
 
-          <div
-            style={{
-              borderRadius: 18,
-              border: "1px solid #e2e8f0",
-              padding: 16,
-              background: "#f8fafc",
-              display: "grid",
-              gap: 12,
-            }}
-          >
-            <div style={{ fontWeight: 700 }}>Optional patient portal pairing</div>
-            <div style={{ display: "grid", gap: 8 }}>
-              <Label htmlFor="portal_email">Portal email</Label>
-              <Input
-                id="portal_email"
-                type="email"
-                value={form.portal_email}
-                onChange={(event) => setForm((current) => ({ ...current, portal_email: event.target.value }))}
-              />
+          <div style={{ padding: "10px 12px", background: "#F8FAFC", border: "1px solid var(--ds-border)", borderRadius: 6, display: "grid", gap: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "var(--ds-text-3)" }}>
+              Portal pairing (optional)
             </div>
-            <div style={{ display: "grid", gap: 8 }}>
-              <Label htmlFor="portal_password">Temporary portal password</Label>
-              <Input
-                id="portal_password"
-                type="password"
-                value={form.portal_password}
-                onChange={(event) => setForm((current) => ({ ...current, portal_password: event.target.value }))}
-              />
+            <div className="db-field">
+              <label className="db-label-field" htmlFor="portal_email">Portal email</label>
+              <input id="portal_email" type="email" className="db-input" value={form.portal_email}
+                onChange={(e) => setForm((c) => ({ ...c, portal_email: e.target.value }))} />
+            </div>
+            <div className="db-field">
+              <label className="db-label-field" htmlFor="portal_password">Temp password</label>
+              <input id="portal_password" type="password" className="db-input" value={form.portal_password}
+                onChange={(e) => setForm((c) => ({ ...c, portal_password: e.target.value }))} />
             </div>
           </div>
 
-          {patientError ? <p style={{ margin: 0, fontSize: 14, color: "#b91c1c" }}>{patientError}</p> : null}
+          {patientError && <div className="db-alert-error">{patientError}</div>}
 
-          <Button type="submit" className="w-full" disabled={savingPatient}>
-            {savingPatient ? "Creating patient..." : "Add Patient"}
-          </Button>
+          <button type="submit" className="db-btn db-btn-primary" disabled={savingPatient} style={{ width: "100%" }}>
+            {savingPatient ? "Creating…" : "Add Patient"}
+          </button>
         </form>
-      </section>
-    </section>
+      </div>
+    </div>
   );
 }
