@@ -28,9 +28,18 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
 
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedPassword = password.trim();
+
+    if (!normalizedEmail || !normalizedPassword) {
+      setLoading(false);
+      setError("Email and password are required.");
+      return;
+    }
+
     const { error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
+      email: normalizedEmail,
+      password: normalizedPassword,
     });
 
     setLoading(false);

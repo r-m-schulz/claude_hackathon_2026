@@ -3,19 +3,17 @@
 import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createSupabaseBrowserClient } from "@/lib/client/supabase";
 import { LogoIcon } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DEPARTMENTS, CLINICIAN_ROLES } from "@triageai/shared";
-import type { ClinicianRole, Department } from "@triageai/shared";
+import type { ClinicianRole, Department, RegisterInput, RegisterResponse } from "@triageai/shared";
 
 type FormState = "idle" | "loading" | "success" | "error";
 
 export default function SignInPage() {
   const router = useRouter();
-  const supabase = createSupabaseBrowserClient();
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -38,39 +36,47 @@ export default function SignInPage() {
     setState("loading");
     setError(null);
 
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedPassword = password.trim();
     const full_name = `${firstName.trim()} ${lastName.trim()}`.trim();
 
-    const { data, error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          role: "clinician",
-          full_name,
-          department,
-          clinician_role: clinicianRole,
-        },
-      },
-    });
-
-    if (signUpError) {
+    if (!normalizedEmail) {
       setState("error");
-      setError(signUpError.message);
+      setError("Email is required.");
+      return;
+    }
+    if (!normalizedPassword) {
+      setState("error");
+      setError("Password is required.");
       return;
     }
 
-    // Supabase returns a session immediately if email confirmation is disabled,
-    // or a user-but-no-session if confirmation is required.
-    if (data.session) {
-      // Confirmed immediately — redirect to dashboard
-      router.replace("/");
-    } else {
-      // Email confirmation required
-      setState("success");
-      setSuccessMessage(
-        "Account created! Check your email to confirm your address, then sign in.",
-      );
+    const payload: RegisterInput = {
+      role: "clinician",
+      email: normalizedEmail,
+      password: normalizedPassword,
+      full_name,
+      department,
+      clinician_role: clinicianRole,
+    };
+
+    const response = await fetch("/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    const data = (await response.json()) as RegisterResponse;
+
+    if (!response.ok || !data.success) {
+      setState("error");
+      setError(data.message || "Failed to create account.");
+      return;
     }
+
+    // Account is created server-side via admin createUser; user can sign in immediately.
+    setState("success");
+    setSuccessMessage("Account created successfully. You can now sign in.");
   }
 
   if (state === "success" && successMessage) {

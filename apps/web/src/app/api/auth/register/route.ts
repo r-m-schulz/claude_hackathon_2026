@@ -20,7 +20,11 @@ import type { RegisterInput, RegisterResponse } from "@triageai/shared";
  */
 export async function POST(req: Request): Promise<Response> {
   const body: RegisterInput = await req.json();
-  const { role, email, password, full_name, department } = body;
+  const role = body.role;
+  const email = body.email?.trim().toLowerCase();
+  const password = body.password?.trim();
+  const full_name = body.full_name?.trim();
+  const department = body.department;
 
   // --- Validate common fields ---
   if (!role || !["clinician", "patient"].includes(role)) {
