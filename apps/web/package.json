@@ -9,6 +9,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@supabase/supabase-js": "^2.47.0",
     "@triageai/shared": "workspace:*",
     "next": "^15.0.0",
     "react": "^19.0.0",
