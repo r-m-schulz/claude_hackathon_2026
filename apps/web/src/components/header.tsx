@@ -6,10 +6,9 @@ import { LogoIcon } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 
 const menuItems = [
-  { name: "Features", href: "#" },
-  { name: "Solution", href: "#" },
-  { name: "Pricing", href: "#" },
-  { name: "About", href: "#" },
+  { name: "Features", href: "/features" },
+  { name: "Solution", href: "/solution" },
+  { name: "About", href: "/about" },
 ];
 
 export const HeroHeader = () => {
