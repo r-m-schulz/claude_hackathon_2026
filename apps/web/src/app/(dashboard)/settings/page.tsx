@@ -21,7 +21,7 @@ const selectStyle: CSSProperties = {
 
 const textareaStyle: CSSProperties = {
   width: "100%",
-  minHeight: 110,
+  minHeight: 80,
   borderRadius: "0.75rem",
   border: "1px solid #d6dde8",
   padding: "12px 14px",
@@ -341,7 +341,8 @@ export default function SettingsPage() {
           style={{
             display: "grid",
             gap: 20,
-            gridTemplateColumns: "minmax(0, 1.1fr) minmax(300px, 0.9fr)",
+            gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+            alignItems: "stretch",
           }}
         >
           <article
@@ -350,12 +351,20 @@ export default function SettingsPage() {
               border: "1px solid #dbe2ee",
               background: "#ffffff",
               padding: 24,
-              display: "grid",
-              gap: 16,
+              display: "flex",
+              flexDirection: "column",
+              gap: 14,
+              height: "100%",
             }}
           >
             <h2 style={{ margin: 0, fontSize: 24 }}>Tailoring answers</h2>
-            <div style={{ display: "grid", gap: 16 }}>
+            <div
+              style={{
+                display: "grid",
+                gap: 12,
+                gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+              }}
+            >
               {[
                 { key: "care_model", label: "Care model" },
                 { key: "patient_volume", label: "Patient volume" },
@@ -365,7 +374,13 @@ export default function SettingsPage() {
                 { key: "brand_summary", label: "Brand summary" },
                 { key: "workflow_summary", label: "Workflow summary" },
               ].map((field) => (
-                <div key={field.key} style={{ display: "grid", gap: 8 }}>
+                <div
+                  key={field.key}
+                  style={{
+                    display: "grid",
+                    gap: 6,
+                  }}
+                >
                   <Label htmlFor={field.key}>{field.label}</Label>
                   <textarea
                     id={field.key}
@@ -388,9 +403,11 @@ export default function SettingsPage() {
               border: "1px solid #dbe2ee",
               background: "#ffffff",
               padding: 24,
-              display: "grid",
-              gap: 16,
+              display: "flex",
+              flexDirection: "column",
+              gap: 14,
               alignContent: "start",
+              height: "100%",
             }}
           >
             <h2 style={{ margin: 0, fontSize: 24 }}>Brand assets</h2>
@@ -401,7 +418,7 @@ export default function SettingsPage() {
                   borderRadius: 18,
                   border: "1px solid #e2e8f0",
                   background: business?.logo_url ? `url(${business.logo_url}) center/cover` : "#f8fafc",
-                  minHeight: 120,
+                  minHeight: 90,
                 }}
               />
               <input type="file" accept="image/*" onChange={(event) => setLogoFile(event.target.files?.[0] ?? null)} />
@@ -414,7 +431,7 @@ export default function SettingsPage() {
                   borderRadius: 18,
                   border: "1px solid #e2e8f0",
                   background: business?.header_image_url ? `url(${business.header_image_url}) center/cover` : "#f8fafc",
-                  minHeight: 180,
+                  minHeight: 120,
                 }}
               />
               <input type="file" accept="image/*" onChange={(event) => setHeaderFile(event.target.files?.[0] ?? null)} />
