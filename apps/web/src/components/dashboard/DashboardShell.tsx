@@ -1,11 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+
+import { createSupabaseBrowserClient } from "@/lib/client/supabase";
 
 type DashboardShellProps = {
   children: ReactNode;
+};
+
+type ClinicianSummary = {
+  full_name: string | null;
+  email: string | null;
 };
 
 const navigation = [
@@ -15,6 +22,60 @@ const navigation = [
 
 export default function DashboardShell({ children }: DashboardShellProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+  const [clinicianName, setClinicianName] = useState("Loading...");
+  const [clinicianEmail, setClinicianEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadClinician(session: Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"]) {
+      if (!session) {
+        if (!isMounted) return;
+        setClinicianName("Not signed in");
+        setClinicianEmail(null);
+        router.replace("/login");
+        return;
+      }
+
+      const metadata = session.user.user_metadata;
+      const metadataName =
+        typeof metadata?.full_name === "string"
+          ? metadata.full_name
+          : [metadata?.first_name, metadata?.last_name]
+              .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+              .join(" ")
+              .trim();
+
+      const fallbackName = metadataName || session.user.email || "Signed in clinician";
+
+      const { data } = await supabase
+        .from("clinicians")
+        .select("full_name, email")
+        .eq("id", session.user.id)
+        .maybeSingle();
+      const clinician = data as ClinicianSummary | null;
+
+      if (!isMounted) return;
+
+      setClinicianName(clinician?.full_name || fallbackName);
+      setClinicianEmail(clinician?.email || session.user.email || null);
+    }
+
+    supabase.auth.getSession().then(({ data }) => {
+      void loadClinician(data.session);
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      void loadClinician(session);
+    });
+
+    return () => {
+      isMounted = false;
+      listener.subscription.unsubscribe();
+    };
+  }, [router, supabase]);
 
   return (
     <div
@@ -82,7 +143,10 @@ export default function DashboardShell({ children }: DashboardShellProps) {
           }}
         >
           <div style={{ fontWeight: 600 }}>Signed in</div>
-          <div style={{ opacity: 0.85 }}>dr.jordan@triageai.demo</div>
+          <div style={{ opacity: 0.95 }}>{clinicianName}</div>
+          {clinicianEmail && clinicianEmail !== clinicianName ? (
+            <div style={{ opacity: 0.7, fontSize: 12, marginTop: 4 }}>{clinicianEmail}</div>
+          ) : null}
         </div>
       </aside>
 
