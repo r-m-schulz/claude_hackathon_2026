@@ -1,4 +1,5 @@
 import { DEPARTMENTS } from "@triageai/shared";
+import Link from "next/link";
 
 export default function HomePage() {
   return (
@@ -19,6 +20,22 @@ export default function HomePage() {
             <li key={department}>{department}</li>
           ))}
         </ul>
+      </section>
+
+      <section
+        style={{
+          marginTop: 20,
+          padding: 24,
+          background: "#ffffff",
+          borderRadius: 16,
+          border: "1px solid #dde3ee",
+          display: "flex",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <Link href="/login">Open login page</Link>
+        <Link href="/triage">Open dashboard triage feed</Link>
       </section>
     </main>
   );
