@@ -162,7 +162,16 @@ export default function SchedulePage() {
   }
 
   return (
-    <section style={{ display: "grid", gap: 20 }}>
+    <section
+      style={{
+        display: "grid",
+        gap: 20,
+        gridTemplateRows: "auto 1fr",
+        height: "calc(100vh - 32px)",
+        minHeight: 0,
+        overflow: "hidden",
+      }}
+    >
       <header
         style={{
           borderRadius: 24,
@@ -189,6 +198,7 @@ export default function SchedulePage() {
           gap: 20,
           gridTemplateColumns: "minmax(0, 1.3fr) minmax(320px, 0.7fr)",
           alignItems: "start",
+          minHeight: 0,
         }}
       >
         <article
@@ -197,9 +207,12 @@ export default function SchedulePage() {
             border: "1px solid #dbe2ee",
             background: "#ffffff",
             padding: 24,
-            display: "grid",
+            display: "flex",
+            flexDirection: "column",
             gap: 16,
-            minHeight: 780,
+            minHeight: 0,
+            height: "100%",
+            overflow: "hidden",
           }}
         >
           <div>
@@ -210,7 +223,7 @@ export default function SchedulePage() {
             </p>
           </div>
 
-          <div style={{ minHeight: 680 }}>
+          <div style={{ flex: 1, minHeight: 0 }}>
             <WeeklySchedule
               items={schedule}
               weekStart={weekStart}
@@ -221,7 +234,15 @@ export default function SchedulePage() {
           </div>
         </article>
 
-        <div style={{ display: "grid", gap: 20 }}>
+        <div
+          style={{
+            display: "grid",
+            gap: 20,
+            minHeight: 0,
+            overflowY: "auto",
+            alignContent: "start",
+          }}
+        >
           {recommendation ? (
             <article
               style={{
@@ -347,7 +368,6 @@ export default function SchedulePage() {
               ) : null}
             </article>
           ) : null}
-
           <article
             style={{
               borderRadius: 24,

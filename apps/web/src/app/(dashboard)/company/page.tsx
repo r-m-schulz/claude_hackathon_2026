@@ -188,69 +188,140 @@ export default function CompanyPage() {
           display: "grid",
           gap: 20,
           gridTemplateColumns: "minmax(0, 1.1fr) minmax(320px, 0.9fr)",
+          alignItems: "stretch",
         }}
       >
-        <article
-          style={{
-            background: "#ffffff",
-            border: "1px solid #dbe2ee",
-            borderRadius: 24,
-            padding: 24,
-            display: "grid",
-            gap: 18,
-          }}
-        >
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-            <div>
-              <h2 style={{ margin: 0, fontSize: 26 }}>Employees</h2>
-              <p style={{ marginTop: 8, color: "#475569", lineHeight: 1.6 }}>
-                Manage practitioners and HR / reception staff from the company view.
-              </p>
+        <div style={{ display: "grid", gap: 18, gridTemplateRows: "auto 1fr", height: "100%" }}>
+          <article
+            style={{
+              background: "#ffffff",
+              border: "1px solid #dbe2ee",
+              borderRadius: 24,
+              padding: 24,
+              display: "grid",
+              gap: 18,
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: 26 }}>Employees</h2>
+                <p style={{ marginTop: 8, color: "#475569", lineHeight: 1.6 }}>
+                  Manage practitioners and HR / reception staff from the company view.
+                </p>
+              </div>
+              <Button asChild variant="outline">
+                <Link href="/settings">Open settings</Link>
+              </Button>
             </div>
-            <Button asChild variant="outline">
-              <Link href="/settings">Open settings</Link>
-            </Button>
-          </div>
 
-          <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
-            {employees.map((employee) => (
-              <article
-                key={employee.id}
-                style={{
-                  borderRadius: 18,
-                  border: "1px solid #e2e8f0",
-                  padding: 18,
-                  display: "grid",
-                  gap: 8,
-                  background: employee.role === "hr" ? "#f8fafc" : "#f0fdf4",
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                  <strong>{employee.full_name}</strong>
-                  <span
+            <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+              {employees.map((employee) => (
+                <article
+                  key={employee.id}
+                  style={{
+                    borderRadius: 18,
+                    border: "1px solid #e2e8f0",
+                    padding: 18,
+                    display: "grid",
+                    gap: 8,
+                    background: employee.role === "hr" ? "#f8fafc" : "#f0fdf4",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                    <strong>{employee.full_name}</strong>
+                    <span
+                      style={{
+                        fontSize: 12,
+                        borderRadius: 999,
+                        background: "#ffffff",
+                        border: "1px solid #dbe2ee",
+                        padding: "4px 8px",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      {formatRole(employee.role)}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 14, color: "#475569" }}>{employee.email}</div>
+                  <div style={{ fontSize: 14, color: "#475569" }}>
+                    {employee.department ? employee.department.replaceAll("_", " ") : "Operations"}
+                  </div>
+                  <div style={{ fontSize: 14, color: "#475569" }}>
+                    {employee.job_title || (employee.is_owner ? "Owner" : "Team member")}
+                  </div>
+                </article>
+              ))}
+            </div>
+          </article>
+
+          <article
+            style={{
+              background: "#ffffff",
+              border: "1px solid #dbe2ee",
+              borderRadius: 24,
+              padding: 24,
+              display: "flex",
+              flexDirection: "column",
+              gap: 18,
+              height: "100%",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: 26 }}>Recent patients</h2>
+                <p style={{ marginTop: 8, color: "#475569", lineHeight: 1.6 }}>
+                  The company view keeps patients and employee workflows together.
+                </p>
+              </div>
+              <Button asChild variant="outline">
+                <Link href="/patients">Open full patient list</Link>
+              </Button>
+            </div>
+
+            <div style={{ display: "grid", gap: 12, flex: 1, alignContent: "start" }}>
+              {recentPatients.length === 0 ? (
+                <div
+                  style={{
+                    borderRadius: 18,
+                    border: "1px dashed #cbd5e1",
+                    background: "#f8fafc",
+                    padding: 18,
+                    color: "#475569",
+                  }}
+                >
+                  No patients yet. Add your first patient from the Patients page.
+                </div>
+              ) : (
+                recentPatients.map((patient) => (
+                  <div
+                    key={patient.id}
                     style={{
-                      fontSize: 12,
-                      borderRadius: 999,
-                      background: "#ffffff",
-                      border: "1px solid #dbe2ee",
-                      padding: "4px 8px",
-                      textTransform: "uppercase",
+                      borderRadius: 18,
+                      border: "1px solid #e2e8f0",
+                      padding: 18,
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: 16,
+                      alignItems: "center",
+                      flexWrap: "wrap",
                     }}
                   >
-                    {formatRole(employee.role)}
-                  </span>
-                </div>
-                <div style={{ fontSize: 14, color: "#475569" }}>{employee.email}</div>
-                <div style={{ fontSize: 14, color: "#475569" }}>
-                  {employee.department ? employee.department.replaceAll("_", " ") : "Operations"}
-                </div>
-                <div style={{ fontSize: 14, color: "#475569" }}>
-                  {employee.job_title || (employee.is_owner ? "Owner" : "Team member")}
-                </div>
-              </article>
-            ))}
-          </div>
-        </article>
+                    <div>
+                      <strong>{patient.full_name}</strong>
+                      <div style={{ marginTop: 6, fontSize: 14, color: "#475569", lineHeight: 1.6 }}>
+                        {patient.department.replaceAll("_", " ")} | {patient.primary_practitioner_name ?? "Unassigned"} |{" "}
+                        {patient.is_paired ? "Paired account" : "Not paired"}
+                      </div>
+                    </div>
+                    <Button asChild>
+                      <Link href={`/patients/${patient.id}`}>Open profile</Link>
+                    </Button>
+                  </div>
+                ))
+              )}
+            </div>
+          </article>
+        </div>
 
         <form
           onSubmit={onCreateEmployee}
@@ -262,6 +333,7 @@ export default function CompanyPage() {
             display: "grid",
             gap: 16,
             alignContent: "start",
+            height: "100%",
           }}
         >
           <div>
@@ -367,71 +439,6 @@ export default function CompanyPage() {
         </form>
       </section>
 
-      <article
-        style={{
-          background: "#ffffff",
-          border: "1px solid #dbe2ee",
-          borderRadius: 24,
-          padding: 24,
-          display: "grid",
-          gap: 16,
-        }}
-      >
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-          <div>
-            <h2 style={{ margin: 0, fontSize: 26 }}>Recent patients</h2>
-            <p style={{ marginTop: 8, color: "#475569", lineHeight: 1.6 }}>
-              The company view keeps patients and employee workflows together.
-            </p>
-          </div>
-          <Button asChild variant="outline">
-            <Link href="/patients">Open full patient list</Link>
-          </Button>
-        </div>
-
-        <div style={{ display: "grid", gap: 12 }}>
-          {recentPatients.length === 0 ? (
-            <div
-              style={{
-                borderRadius: 18,
-                border: "1px dashed #cbd5e1",
-                background: "#f8fafc",
-                padding: 18,
-                color: "#475569",
-              }}
-            >
-              No patients yet. Add your first patient from the Patients page.
-            </div>
-          ) : (
-            recentPatients.map((patient) => (
-              <div
-                key={patient.id}
-                style={{
-                  borderRadius: 18,
-                  border: "1px solid #e2e8f0",
-                  padding: 18,
-                  display: "flex",
-                  justifyContent: "space-between",
-                  gap: 16,
-                  alignItems: "center",
-                  flexWrap: "wrap",
-                }}
-              >
-                <div>
-                  <strong>{patient.full_name}</strong>
-                  <div style={{ marginTop: 6, fontSize: 14, color: "#475569", lineHeight: 1.6 }}>
-                    {patient.department.replaceAll("_", " ")} | {patient.primary_practitioner_name ?? "Unassigned"} |{" "}
-                    {patient.is_paired ? "Paired account" : "Not paired"}
-                  </div>
-                </div>
-                <Button asChild>
-                  <Link href={`/patients/${patient.id}`}>Open profile</Link>
-                </Button>
-              </div>
-            ))
-          )}
-        </div>
-      </article>
     </section>
   );
 }

@@ -267,7 +267,7 @@ export default function WeeklySchedule({
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 14, height: "100%", overflow: "hidden" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 14, height: "100%"}}>
 
       {/* ── week navigation ── */}
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
