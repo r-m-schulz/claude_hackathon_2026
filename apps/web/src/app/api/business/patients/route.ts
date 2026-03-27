@@ -246,11 +246,9 @@ export async function POST(req: Request) {
     }
 
     if (createdPatientId && supabase) {
-      await supabase
-        .from("patients")
-        .delete()
-        .eq("id", createdPatientId)
-        .catch(() => null);
+      await Promise.resolve(
+        supabase.from("patients").delete().eq("id", createdPatientId)
+      ).catch(() => null);
     }
 
     return jsonErrorResponse(error, "Unable to create patient.");
